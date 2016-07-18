@@ -4,3 +4,7 @@
 *.ttf
 *.otf
 *.7z
+*.rpgsave
+
+# VSCode configs.
+js/.vscode/*
