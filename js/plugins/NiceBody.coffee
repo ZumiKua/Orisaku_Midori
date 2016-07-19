@@ -59,7 +59,6 @@ class @NiceBody extends @Sprite
     @express = "normal"
     @x = Graphics.width - 320 + 40
     @opacity = 0
-    @scale.x = -1
     @express_sprite_ids = []
     @pic_width = Number(parameters['WIDTH'] || 431)
     @pic_height = Number(parameters['HEIGHT'] || 624)

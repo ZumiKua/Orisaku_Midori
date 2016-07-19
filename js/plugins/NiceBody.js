@@ -80,7 +80,6 @@ this.NiceBody = (function(superClass) {
     this.express = "normal";
     this.x = Graphics.width - 320 + 40;
     this.opacity = 0;
-    this.scale.x = -1;
     this.express_sprite_ids = [];
     this.pic_width = Number(parameters['WIDTH'] || 431);
     this.pic_height = Number(parameters['HEIGHT'] || 624);
