@@ -6,7 +6,7 @@
 ###
 
 Scene_Battle.prototype._BattleUIAdjustment_Alias_createActorCommandWindow = Scene_Battle.prototype.createActorCommandWindow
-Scene_Battle.prototype._BattleUIAdjustment_Alias_createHelpWindow = Scene_Battle.prototype.createHelpWindow 
+Scene_Battle.prototype._BattleUIAdjustment_Alias_createHelpWindow = Scene_Battle.prototype.createHelpWindow
 Scene_Battle.prototype._BattleUIAdjustment_Alias_createSkillWindow = Scene_Battle.prototype.createSkillWindow
 Scene_Battle.prototype._BattleUIAdjustment_Alias_createStatusWindow = Scene_Battle.prototype.createStatusWindow
 Window_ActorCommand.prototype._BattleUIAdjustment_Alias_makeCommandList = Window_ActorCommand.prototype.makeCommandList
@@ -59,5 +59,3 @@ Window_BattleSkill.prototype.maxCols = ()->
 
 Window_BattleSkill.prototype.spacing = ()->
     24
-
-

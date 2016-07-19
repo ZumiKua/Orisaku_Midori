@@ -15,6 +15,12 @@
   @param EXPRESS_PREFIX
   @desc the prefix of express picture.
   @default exp_
+  @param WIDTH
+  @desc the width of pictures.
+  @default 431
+  @param HEIGHT
+  @desc the height of pictures.
+  @default 624
  */
 var _Nicebody_Alias_Game_Interpreter_pluginCommand, _Nicebody_Alias_Scene_Map_createDisplayObjects, _Nicebody_Alias_Scene_Map_update, parameters,
   extend = function(child, parent) { for (var key in parent) { if (hasProp.call(parent, key)) child[key] = parent[key]; } function ctor() { this.constructor = child; } ctor.prototype = parent.prototype; child.prototype = new ctor(); child.__super__ = parent.prototype; return child; },
@@ -27,15 +33,22 @@ this.Game_Interpreter.prototype.pluginCommand = function(command, args) {
   if (command === 'NiceBody') {
     switch (args[0]) {
       case "playExpress":
-        console.log(SceneManager._scene.nice_body);
         if (SceneManager._scene.nice_body) {
           return SceneManager._scene.nice_body.express = args[1];
+        }
+        break;
+      case "show":
+        if (SceneManager._scene.nice_body) {
+          return SceneManager._scene.nice_body.show();
+        }
+        break;
+      case "hide":
+        if (SceneManager._scene.nice_body) {
+          return SceneManager._scene.nice_body.hide();
         }
     }
   }
 };
-
-parameters = PluginManager.parameters('NiceBody');
 
 _Nicebody_Alias_Scene_Map_createDisplayObjects = this.Scene_Map.prototype.createDisplayObjects;
 
@@ -52,35 +65,25 @@ this.Scene_Map.prototype.update = function() {
   return this.nice_body.update();
 };
 
+parameters = PluginManager.parameters('NiceBody');
+
 this.NiceBody = (function(superClass) {
   extend(NiceBody, superClass);
 
   function NiceBody() {
-    var actor_id, elem, j, len, ref, sprite;
+    var actor_id;
     this.initialize.call(this);
     this.express_prefix = String(parameters['EXPRESS_PREFIX'] || "exp_");
     this.orders = String(parameters['ORDER'] || "backhair|nakedbody|Head|Body|fronthair|Accessory").split("|");
     actor_id = Number(parameters['ACTOR_ID'] || "1");
     this._actor = $gameActors.actor(actor_id);
     this.express = "normal";
-    this.x = Graphics.width - 320;
+    this.x = Graphics.width - 320 + 40;
+    this.opacity = 0;
+    this.scale.x = -1;
     this.express_sprite_ids = [];
-    this.sprites = (function() {
-      var j, len, ref, results;
-      ref = this.orders;
-      results = [];
-      for (j = 0, len = ref.length; j < len; j++) {
-        elem = ref[j];
-        results.push(new Sprite());
-      }
-      return results;
-    }).call(this);
-    ref = this.sprites;
-    for (j = 0, len = ref.length; j < len; j++) {
-      sprite = ref[j];
-      sprite.blendMode = PIXI.blendModes.NORMAL;
-      this.addChild(sprite);
-    }
+    this.pic_width = Number(parameters['WIDTH'] || 431);
+    this.pic_height = Number(parameters['HEIGHT'] || 624);
     this.refresh();
   }
 
@@ -112,33 +115,99 @@ this.NiceBody = (function(superClass) {
     if (part) {
       fn += "_" + part;
     }
-    console.log(fn);
     return ImageManager.loadPicture(fn);
   };
 
   NiceBody.prototype.refresh = function() {
-    var elem, i, j, len, ref;
+    var already_blted, elem, fflag, i, j, k, l, len, len1, len2, len3, m, ref, ref1, src, srcs;
+    this.bitmap = new Bitmap(this.pic_width, this.pic_height);
+    srcs = [];
+    already_blted = false;
     ref = this.orders;
     for (i = j = 0, len = ref.length; j < len; i = ++j) {
       elem = ref[i];
-      if (elem.split(",")[0] === "express") {
-        this.express_sprite_ids.push(i);
+      srcs[i] = this.generateBitmap(elem);
+    }
+    ref1 = this.orders;
+    for (i = k = 0, len1 = ref1.length; k < len1; i = ++k) {
+      elem = ref1[i];
+      srcs[i].addLoadListener((function(self) {
+        var flag, l, len2, len3, m, src;
+        if (already_blted) {
+          return;
+        }
+        flag = true;
+        for (l = 0, len2 = srcs.length; l < len2; l++) {
+          src = srcs[l];
+          if (!src.isReady()) {
+            flag = false;
+          }
+        }
+        if (flag) {
+          already_blted = true;
+          console.log(self);
+          for (m = 0, len3 = srcs.length; m < len3; m++) {
+            src = srcs[m];
+            this.bitmap.blt(src, 0, 0, this.pic_width, this.pic_height, 0, 0);
+          }
+        }
+        return 0;
+      }).bind(this, srcs[i]));
+    }
+    fflag = true;
+    for (l = 0, len2 = srcs.length; l < len2; l++) {
+      src = srcs[l];
+      if (!src.isReady()) {
+        fflag = false;
       }
-      this.sprites[i].bitmap = this.generateBitmap(elem);
+    }
+    if (fflag) {
+      already_blted = true;
+      for (m = 0, len3 = srcs.length; m < len3; m++) {
+        src = srcs[m];
+        this.bitmap.blt(src, 0, 0, this.pic_width, this.pic_height, 0, 0);
+      }
     }
     return this.old_express = this.express;
   };
 
   NiceBody.prototype.update = function() {
-    var id, j, len, ref;
     if (this.express !== this.old_express) {
-      ref = this.express_sprite_ids;
-      for (j = 0, len = ref.length; j < len; j++) {
-        id = ref[j];
-        this.sprites[id].bitmap = this.generateBitmap(this.orders[id]);
-      }
-      return this.old_express = this.express;
+      this.refresh();
+      this.old_express = this.express;
     }
+    if (this.showing) {
+      this.x -= 5;
+      this.opacity += 13;
+      if (this.x <= Graphics.width - 320) {
+        this.x = Graphics.width - 320;
+        this.showing = false;
+        this.opacity = 255;
+      }
+    }
+    if (this.hiding) {
+      this.x += 5;
+      this.opacity -= 13;
+      if (this.x >= Graphics.width - 320 + 80) {
+        this.x = Graphics.width - 320 + 80;
+        this.hiding = false;
+        return this.opacity = 0;
+      }
+    }
+  };
+
+  NiceBody.prototype.show = function() {
+    this.hiding = false;
+    this.showing = true;
+    this.opacity = 0;
+    return this.x = Graphics.width - 320 + 80;
+  };
+
+  NiceBody.prototype.hide = function() {
+    this.showing = false;
+    this.hiding = true;
+    this.opacity = 255;
+    return this.x = Graphics.width - 320;
   };
 
   return NiceBody;

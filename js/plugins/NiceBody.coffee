@@ -14,18 +14,30 @@
   @param EXPRESS_PREFIX
   @desc the prefix of express picture.
   @default exp_
+  @param WIDTH
+  @desc the width of pictures.
+  @default 431
+  @param HEIGHT
+  @desc the height of pictures.
+  @default 624
 ###
+
 _Nicebody_Alias_Game_Interpreter_pluginCommand = Game_Interpreter.prototype.pluginCommand
 @Game_Interpreter.prototype.pluginCommand = (command, args)->
   _Nicebody_Alias_Game_Interpreter_pluginCommand.call(this, command, args)
   if (command == 'NiceBody')
     switch(args[0])
       when "playExpress"
-        console.log(SceneManager._scene.nice_body)
         if SceneManager._scene.nice_body
           SceneManager._scene.nice_body.express = args[1]
+      when "show"
+        if SceneManager._scene.nice_body
+          SceneManager._scene.nice_body.show()
+      when "hide"
+        if SceneManager._scene.nice_body
+          SceneManager._scene.nice_body.hide()
 
-parameters = PluginManager.parameters('NiceBody');
+
 _Nicebody_Alias_Scene_Map_createDisplayObjects = @Scene_Map.prototype.createDisplayObjects
 @Scene_Map.prototype.createDisplayObjects = ()->
   _Nicebody_Alias_Scene_Map_createDisplayObjects.apply(this,arguments)
@@ -35,6 +47,8 @@ _Nicebody_Alias_Scene_Map_update = @Scene_Map.prototype.update
 @Scene_Map.prototype.update = ()->
   _Nicebody_Alias_Scene_Map_update.apply(this,arguments)
   @nice_body.update()
+
+parameters = PluginManager.parameters('NiceBody');
 class @NiceBody extends @Sprite
   constructor: ()->
     @initialize.call(this)
@@ -43,12 +57,16 @@ class @NiceBody extends @Sprite
     actor_id = Number(parameters['ACTOR_ID'] || "1")
     @_actor = $gameActors.actor(actor_id)
     @express = "normal"
-    @x = Graphics.width - 320
+    @x = Graphics.width - 320 + 40
+    @opacity = 0
+    @scale.x = -1
     @express_sprite_ids = []
-    @sprites = (new Sprite() for elem in @orders)
-    for sprite in @sprites
-      sprite.blendMode = PIXI.blendModes.NORMAL
-      @addChild(sprite)
+    @pic_width = Number(parameters['WIDTH'] || 431)
+    @pic_height = Number(parameters['HEIGHT'] || 624)
+    #@sprites = (new Sprite() for elem in @orders)
+    #for sprite in @sprites
+    #  sprite.blendMode = PIXI.blendModes.NORMAL
+    #  @addChild(sprite)
     @refresh()
   generateBitmap: (full_elem)->
     splited_elem = full_elem.split(",")
@@ -74,17 +92,62 @@ class @NiceBody extends @Sprite
     #resolve part
     if part
       fn += "_" + part
-    console.log(fn)
     ImageManager.loadPicture(fn)
 
   refresh: ()->
+    @bitmap = new Bitmap(@pic_width,@pic_height)
+    srcs = []
+    already_blted = false
     for elem,i in @orders
-      if(elem.split(",")[0] == "express")
-        @express_sprite_ids.push i
-      @sprites[i].bitmap = @generateBitmap(elem)
+      srcs[i] = @generateBitmap(elem)
+    for elem,i in @orders
+      srcs[i].addLoadListener(((self)->
+          return if already_blted
+          flag = true
+          for src in srcs
+            if(!src.isReady())
+              flag = false
+          if flag
+            already_blted = true
+            console.log(self)
+            for src in srcs
+              @bitmap.blt(src,0,0,@pic_width,@pic_height,0,0)
+          0
+        ).bind(this,srcs[i]))
+    fflag = true
+    for src in srcs
+      if(!src.isReady())
+        fflag = false
+    if fflag
+      already_blted = true
+      for src in srcs
+        @bitmap.blt(src,0,0,@pic_width,@pic_height,0,0)
     @old_express = @express
   update: ()->
     if @express != @old_express
-      for id in @express_sprite_ids
-        @sprites[id].bitmap = @generateBitmap(@orders[id])
+      @refresh()
       @old_express = @express
+    if @showing
+      @x -= 5
+      @opacity += 13
+      if @x <= Graphics.width - 320
+        @x = Graphics.width - 320
+        @showing = false
+        @opacity = 255
+    if @hiding
+      @x += 5
+      @opacity -= 13
+      if @x >= Graphics.width - 320 + 80
+        @x = Graphics.width - 320 + 80
+        @hiding = false
+        @opacity = 0
+  show: ()->
+    @hiding = false
+    @showing = true
+    @opacity = 0
+    @x = Graphics.width - 320 + 80
+  hide: ()->
+    @showing = false
+    @hiding = true
+    @opacity = 255
+    @x = Graphics.width - 320
