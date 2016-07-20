@@ -5,6 +5,6 @@
 *.otf
 *.7z
 *.rpgsave
-
+!img/pictures/*
 # VSCode configs.
 js/.vscode/*
