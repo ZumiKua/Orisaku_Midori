@@ -19,13 +19,23 @@
 
     @param showProficiencyNumber
     @default no
-    @desc Decide show the number or progress bar of proficiency when magic stone is showm.
+    @desc Decide show the number or progress bar of proficiency when magic stone is shown.
     'yes' or 'no'
 
     @param showContentWhenTransfer
     @default none
     @desc Decide show what content for target skill in new magic stone when transferring.
     'energy', 'mp', 'both' or 'none'
+
+    @param transferType
+    @default move
+    @desc Decide the behave 'transfer' actually copy or move the skill between magic stones.
+    'move' or 'copy'
+
+    @param destroyStoneWhen
+    @default transferred
+    @desc After transferring, how to handle the origin magic stone.
+    'transferred', 'clear' or 'never'
 
     @help
     skillFactorInfluence:
@@ -47,10 +57,16 @@
       if showEnergyNumber is set no, it will show the predicted energy progress bar.
     + 'both' will show both the mp and energy.
 
+    destroyStoneWhen
+    + 'transferred' means any skill transferring would destroy the source.
+    + 'clear' means after transferring, space magic stone would be destroyed. 
+    + 'never' means do nothing.
+
 ###
 
 Game_Party.prototype._MagicStone_Alias_initAllItems = Game_Party.prototype.initAllItems
 Game_Interpreter.prototype._MagicStone_Alias_pluginCommand = Game_Interpreter.prototype.pluginCommand
+MagicStoneParameters = PluginManager.parameters 'MagicStone'
 
 class MagicStone
     constructor: (name, level, factor, skills, maxEnergy, proficiency, maxProficiency)->
@@ -65,18 +81,19 @@ class MagicStone
         this._energy += this.energyCost(skill_id) for skill_id in this._skills
     
     mpCost: (skill) ->
+        skill = $dataSkills[skill] if typeof skill == 'number'
         origin = skill.mpCost
-        switch PluginManager.paramteres 'skillFactorInfluence'
+        switch MagicStoneParameters.skillFactorInfluence
             when 'nothing' then origin
             when 'add'     then Math.ceil origin + this._magicFactor
             when 'times'   then Math.ceil origin * this._magicFactor
             when 'replace' then Math.ceil this._magicFactor
             else                Math.ceil origin * this._magicFactor
 
-    energyCost: (skill_id) ->
-        skill = $dataSkills[skill_id]
+    energyCost: (skill) ->
+        skill = $dataSkills[skill] if typeof skill == 'number'
         data = skill.meta.energyCost
-        return 0 if data == null || data == undefined
+        return 1 if data == null || data == undefined
         parseInt data
 
     transfer: (skill) ->
@@ -88,21 +105,26 @@ class MagicStone
             this._skill.push skill
             return true
 
-    proficiencyRatio: ()->
+    proficiencyRatio: ->
         this._proficiency / this._maxProficiency
-    energyRatio: ()->
+        
+    energyRatio: ->
         return this._energy / this._maxEnergy
 
-Game_Party.prototype.initAllItems = () ->
-    this._MagicStone_Alias_initAllItems();
-    this._magicStones = []
+    predictedEnergyRatio: (skill) ->
+        skill = $dataSkills[skill] if typeof skill == 'number'
+        return (this._energy + @energyCost skill) / this._maxEnergy
 
-Game_Party.prototype.magicStones = ()->
-    this._magicStones
+    isEmpty: ->
+        return this._skills.length == 0
 
-Game_Party.prototype.generateMagicStoneRandomly = (minLevel, maxLevel) ->
+    isFull: ->
+        return this._skills.length >= 7 or this._energy >= this._maxEnergy
 
-Game_Party.prototype.generateMagicStoneFromItem = (itemIndex) ->
+MagicStoneManager = ->
+    throw new error "This is a static class"
+
+MagicStoneManager.generateMagicStoneFromItem = (itemIndex) ->
     item = $dataItems[itemIndex]
     name = item.name
     skillsString = item.meta.skills || "[]"
@@ -113,6 +135,21 @@ Game_Party.prototype.generateMagicStoneFromItem = (itemIndex) ->
     proficiency = parseInt item.meta.proficiency || "0"
     maxProficiency = parseInt item.meta.maxProficiency || "100"
     new MagicStone name, level, factor, skills, maxEnergy, proficiency, maxProficiency
+
+MagicStoneManager.generateMagicStoneRandomly = (minLevel, maxLevel) ->
+
+MagicStoneManager.magicStones = ->
+    $gameParty.magicStones()
+
+MagicStoneManager.gainMagicStone = (stone)->
+    MagicStoneManager.magicStones().push stone
+
+Game_Party.prototype.initAllItems = () ->
+    this._MagicStone_Alias_initAllItems();
+    this._magicStones = []
+
+Game_Party.prototype.magicStones = ->
+    this._magicStones
 
 class @Spriteset_Progressbar extends @Sprite
     constructor: ()->
@@ -137,17 +174,23 @@ class @Spriteset_Progressbar extends @Sprite
         @foreground.scale.x = @value
 
     setValue: (value)->
-        console.log value
         @value = value
         @refresh()
 
 Window_Base.prototype.drawTextOnLine = (line, text, align, x_move) ->
-    x = this.textPadding()
-    y = this.lineHeight() * line
-    width  = @contents.width - this.textPadding() * 2
-    height = this.lineHeight();
+    x = @textPadding()
+    y = @lineHeight() * line
+    width  = @contents.width - @textPadding() * 2
+    height = @lineHeight();
     x += Math.floor width * x_move if x_move != undefined
     @contents.drawText text, x, y, width, height, align
+
+Window_Base.prototype.drawSkill = (line, width, skill, cost)->
+    skill = $dataSkills[skill] if typeof skill == 'number'
+    y = @lineHeight() * line
+    @drawItemName skill, 0, y, width
+    cost = skill.mpCost if cost < 0 || cost == undefined
+    @contents.drawText cost.toString(), 0, y, width, @lineHeight(), 'right'
 
 class Window_StoneList extends @Window_Selectable
     constructor: (x, y)->
@@ -157,27 +200,35 @@ class Window_StoneList extends @Window_Selectable
     drawItem: (index) ->
         stone = @magicStoneAtIndex index
         return if stone == null || stone == undefined
+        @changePaintOpacity @isEnabled stone
         rect = @itemRectForText index
         @contents.drawText stone._name, rect.x, rect.y, rect.width, rect.height, 'left'
+        @changePaintOpacity 1
 
     magicStoneAtIndex: (index) ->
         $gameParty.magicStones()[index]
 
+    magicStoneChosen: ->
+        @magicStoneAtIndex this._index
+
     maxItems: (index) ->
         Math.max 1, $gameParty.magicStones().length
 
-    updateHelp: ()->
-        @setHelpWindowItem @magicStoneAtIndex this._index
+    updateHelp: ->
+        @setHelpWindowItem @magicStoneChosen()
 
-    windowWidth: () ->
+    windowWidth: ->
         Graphics.width / 2
 
-    windowHeight: () ->
+    windowHeight: ->
         340
 
-    createHelpWindow: ()->
+    createHelpWindow: ->
         this._helpWindow = new Window_StoneHelp 0
         @addChild this._helpWindow
+
+    isEnabled: (stone)->
+        true
 
 class Window_StoneHelp extends @Window_Base
     constructor: (windowX)->
@@ -185,9 +236,9 @@ class Window_StoneHelp extends @Window_Base
         windowY = Graphics.boxHeight - windowHeight
         @initialize.call this, windowX, windowY, Graphics.width / 2, windowHeight
         @stone = null
-        if PluginManager.parameters('showProficiencyNumber') != 'yes'
+        if MagicStoneParameters.showProficiencyNumber != 'yes'
             @proficiencyProgressBar = @createPreogressBar 1
-         if PluginManager.parameters('showEnergyNumber') != 'yes'
+         if MagicStoneParameters.showEnergyNumber != 'yes'
             @energyProgressBar = @createPreogressBar 2
 
     createPreogressBar: (line) ->
@@ -203,14 +254,13 @@ class Window_StoneHelp extends @Window_Base
         @drawTextOnLine 0, @stone._name, 'left'
         @drawTextOnLine 0, @stone._level, 'right'
         @drawTextOnLine 1, "熟练度", 'left'
-        if PluginManager.parameters('showProficiencyNumber') == 'yes'
-            cosnole.log "#{@stone._proficiency} / #{@stone._maxProficiency}"
-            @drawTextOnLine 1, "#{@stone._proficiency} / #{@stone._maxProficiency}"
+        if MagicStoneParameters.showProficiencyNumber == 'yes'
+            @drawTextOnLine 1, "#{@stone._proficiency} / #{@stone._maxProficiency}", 'right'
         else
             @proficiencyProgressBar.visible = true
             @proficiencyProgressBar.setValue @stone.proficiencyRatio()
-        if PluginManager.parameters('showEnergyNumber') == 'yes'
-            @drawTextOnLine 1, "#{@stone._energy} / #{@stone._maxEnergy}"
+        if MagicStoneParameters.showEnergyNumber == 'yes'
+            @drawTextOnLine 2, "#{@stone._energy} / #{@stone._maxEnergy}", 'right'
         else
             @energyProgressBar.visible = true
             @energyProgressBar.setValue @stone.energyRatio()
@@ -230,14 +280,130 @@ class Window_StoneHelp extends @Window_Base
 
 class Window_TransferSkillList extends Window_Selectable
     constructor: ()->
-        @initialize.call this
+        width = @windowWidth()
+        x = (Graphics.boxWidth - width) / 2
+        @initialize.call this, x, 0, width, 100
 
     updateHelp: ()->
+        @setHelpWindowItem @selectedSkill()
+    
+    setSkills: (skills)->
+        @datas = skills
+        this.height = @lineHeight() * skills.length + 2 * this.standardPadding()
+        fullHeight = this.height + this._titleWindow.height + this._helpWindow.height
+        this.y = (Graphics.boxHeight - fullHeight) / 2 + this._titleWindow.height
+        this._helpWindow.y = this.height
+        @createContents()
+        @refresh()
+
+    windowWidth: ->
+        400
+
+    maxItems: ->
+        return 1 if @datas == null || @datas == undefined
+        Math.max 1, @datas.length
+
+    skillAtIndex: (index)->
+        $dataSkills[@datas[index]]
+
+    selectedSkill: ->
+        @skillAtIndex this.index()
+
+    drawItem: (index) ->
+        return if @datas == null || @datas == undefined || @datas.length == 0
+        skill = $dataSkills[@datas[index]]
+        @drawSkill index, @contents.width, skill, @fromStone.mpCost skill
+
+    createHelpWindow: ->
+        this._helpWindow = new Window_TransferSkillHelp 0, @height, @width
+        this._helpWindow.openness = this.openness
+        @addChild this._helpWindow
+
+    createTitleWindow: ->
+        height = this.lineHeight() + this.standardPadding() * 2
+        this._titleWindow = new Window_Base 0, -height, this._width, height
+        this._titleWindow.openness = this.openness
+        this._titleWindow.contents.drawText "请选择技能", 0, 0, this._titleWindow.contents.width, @lineHeight(), 'center'
+        @addChild this._titleWindow
+
+    setOpenness: (value)->
+        this.openness = value
+        this._helpWindow.openness = value if this._helpWindow != undefined and this._helpWindow != null
+        this._titleWindow.openness = value if this._titleWindow != undefined and this._titleWindow != null
+
+    setStones: (fromStone, toStone)->
+        @fromStone = fromStone
+        this._helpWindow.toStone = toStone
+
+    open: ->
+        Window_Base.prototype.open.call this
+        this._helpWindow.open()
+        this._titleWindow.open()
+
+    close: ->
+        Window_Base.prototype.close.call this
+        this._helpWindow.close()
+        this._titleWindow.close();
 
 class Window_TransferSkillHelp extends Window_Base
-    constructor: ()->
-        @initialize.call this
-            
+    constructor: (x, y, width)->
+        line = 0
+        content = MagicStoneParameters.showContentWhenTransfer
+        switch content
+            when 'energy' then line = 1
+            when 'mp' then line = 1
+            when 'both' then line = 2
+            when 'none' then line = 0
+        height = @lineHeight() * line + @standardPadding() * 2
+        height = 0 if line == 0
+        @initialize.call this, x, y, width, height
+        @createProgressBar() if MagicStoneParameters.showEnergyNumber != 'yes'
+    setItem: (item)->
+        @skill = item
+        @refresh()
+
+    createProgressBar: ->
+        @progressBar = new Spriteset_Progressbar
+        @progressBar.visible = false
+        @addChild @progressBar
+
+    refresh: ->
+        return if !@skill or !@toStone
+        @contents.clear()
+        @focusLine = 0
+        switch MagicStoneParameters.showContentWhenTransfer
+            when 'mp' then @drawPredictedSkill()
+            when 'energy' then @drawPredictedEnergy()
+            when 'both'
+                @drawPredictedSkill()
+                @drawPredictedEnergy()
+
+    drawPredictedSkill: ->
+        return if !@toStone
+        @drawSkill @focusLine, @contents.width, @skill, @toStone.mpCost @skill
+        @focusLine += 1
+
+    drawPredictedEnergy: ->
+        return if !@toStone
+        @drawTextOnLine @focusLine, "转录后能量", "left"
+        if MagicStoneParameters.showEnergyNumber == 'yes'
+            text = "#{@toStone._energy + @toStone.energyCost @skill} / #{@toStone._maxEnergy}"
+            @drawTextOnLine @focusLine, text, "right"
+        else
+            predicted = @toStone.predictedEnergyRatio @skill
+            if predicted > 1
+                @progressBar.visible = false
+                @drawTextOnLine @focusLine, "能量不足", "left", 0.5
+            else 
+                @progressBar.visible = true
+                @progressBar.x = @width / 2
+                @progressBar.y = @focusLine * @lineHeight() + 6 + @standardPadding()
+                @progressBar.setValue @toStone.predictedEnergyRatio @skill
+        @focusLine += 1
+
+    close: ->
+        Window_Base.prototype.close.call this
+        @progressBar.visible = false if @progressBar
 
 class @Scene_Transfer extends @Scene_Base
     constructor: ()->
@@ -248,48 +414,136 @@ class @Scene_Transfer extends @Scene_Base
        
     create: ()->
         @createWindowLayer()
-        @createWindows();
+        @createFromWindows()
+        @createToWindows()
+        @createSkillWinodw()
+        @createMessageWindow()
         @switchState 'from'
 
-    createWindows:  ()->
-        @fromStoneListWindow= new Window_StoneList 0, 0
-        @toStoneListWindow = new Window_StoneList Graphics.width / 2, 0
+    createFromWindows: ->
+        @fromStoneListWindow = new Window_StoneList 0, 0
         @fromStoneListWindow.createHelpWindow()
+        @fromStoneListWindow.setHandler 'ok', @onFromListOk.bind this
+        @fromStoneListWindow.setHandler 'cancel', @onFromListCancel.bind this
+        @fromStoneListWindow.isEnabled = (stone) ->
+            !(stone.isEmpty())
+        @fromStoneListWindow.refresh()
+        @addChild @fromStoneListWindow
+
+    createToWindows: ->
+        @toStoneListWindow = new Window_StoneList Graphics.width / 2, 0
         @toStoneListWindow.createHelpWindow()
+        @toStoneListWindow.setHandler 'ok', @onToListOK.bind this
+        @toStoneListWindow.setHandler 'cancel', @onToListCancel.bind this
+        @toStoneListWindow.isEnabled = (stone) ->
+            !(stone.isFull() && stone != @fromMagicStone)
+        @toStoneListWindow.isEnabled.bind this
+        @toStoneListWindow.refresh()
+        @addChild @toStoneListWindow
+
+    createSkillWinodw: ->
         @skillListWindow = new Window_TransferSkillList
-        @skillHelpWindow.createHelpWindow()
-        @addWindow @fromStoneListWindow
-        @addWindow @toStoneListWindow
+        @skillListWindow.setOpenness 0
+        @skillListWindow.createHelpWindow()
+        @skillListWindow.createTitleWindow()
+        @skillListWindow.setHandler 'ok', @onSkillListOK.bind this
+        @skillListWindow.setHandler 'cancel', @onSkillListCancel.bind this
+        @addChild @skillListWindow
+
+    createMessageWindow: ->
+        @messageWindow = new Window_Base
+        @messageWindow.openness = 0
+        @addChild @messageWindow
 
     update: ()->
         Scene_Base.prototype.update.call this
+        if @state == 'message'
+            if Input.isRepeated('ok') or Input.isTriggered('cancel')
+                @onMessageWindowOK();
 
     switchState: (state)->
         switch state
             when 'from'
                 @fromStoneListWindow.activate()
-                @fromStoneListWindow.select 0
+                @fromStoneListWindow.select 0 if @fromStoneListWindow.index() < 0
                 @toStoneListWindow.deactivate()
             when 'to'
                 @fromStoneListWindow.deactivate()
                 @toStoneListWindow.activate()
-                @toStoneListWindow.select 0
+                @toStoneListWindow.select 0 if @toStoneListWindow.index() < 0
             when 'skill'
                 @fromStoneListWindow.deactivate()
                 @toStoneListWindow.deactivate()
-                @skillListWindow.open
-            when 'progress'
-                @skillListWindow.close
-                
+                @skillListWindow.open()
+                @skillListWindow.activate()
+                @skillListWindow.select 0
+            when 'message'
+                @lastState = @state
+                @fromStoneListWindow.deactivate()
+                @toStoneListWindow.deactivate()
+                @messageWindow.open()
+
+        @state = state
+
+    onFromListOk: ()->
+        @fromMagicStone = @fromStoneListWindow.magicStoneChosen()
+        if @fromMagicStone.isEmpty()
+            @setMessageWindow "这个魔石上没有刻录技能。"
+            @switchState 'message'
+        else
+            @switchState 'to'
+
+    onFromListCancel: ()->
+        SceneManager.goto(Scene_Map)
+
+    onToListOK: ()->
+        @toMagicStone = @toStoneListWindow.magicStoneChosen()
+        if @toMagicStone == @fromMagicStone
+            @setMessageWindow "这两者是同一块魔石。"
+            @switchState 'message'
+        else if @toMagicStone.isFull()
+            @setMessageWindow "这块魔石已经写满了。"
+            @switchState 'message'
+        else
+            @skillListWindow.setStones @fromMagicStone, @toMagicStone
+            @skillListWindow.setSkills @fromMagicStone._skills
+            @switchState 'skill'
+
+    onToListCancel: ()->
+        @fromMagicStone = null
+        @toStoneListWindow.select -1
+        @switchState 'from'
+
+    onSkillListOK: ()->
+
+    onSkillListCancel: ()->
+        @toMagicStone = null
+        @skillListWindow.close()
+        @switchState 'to'
+
+    onMessageWindowOK: ()->
+        @messageWindow.close()
+        @switchState @lastState
+
+    setMessageWindow: (message)->
+        width = @messageWindow.textWidth message
+        @messageWindow.width = width + @messageWindow.standardPadding() + 2 * @messageWindow.textPadding()
+        @messageWindow.height = @messageWindow.lineHeight() + 2 * @messageWindow.standardPadding()
+        @messageWindow.x = (Graphics.boxWidth - @messageWindow.width) / 2
+        @messageWindow.y = (Graphics.boxHeight - @messageWindow.height) / 2
+        @messageWindow.createContents()
+        @messageWindow.drawTextEx message, @messageWindow.textPadding(), 0
+
 
 Game_Interpreter.prototype.pluginCommand = (command, args) ->
     this._MagicStone_Alias_pluginCommand command, args
     if command == 'MagicStone'
         switch args[0]
             when 'test'
-                $gameParty.magicStones().push new MagicStone "简单的石头", 1, 1, [1,2,3,4,5], 100, 60, 100
+                $gameParty.magicStones().push new MagicStone "简单的石头", 1, 1.4, [6,7,8,9], 100, 60, 100
+                $gameParty.magicStones().push new MagicStone "老旧的石头", 0, 2.5, [1,2,3,4,5], 5, 100, 100
             when 'fromItem'
                 idString = args[1]
                 throw new exception 'create magic stone from item with no id' if idString == undefined || idString == null
                 id = parseInt idString
-                $gameParty.magicStones().push $gameParty.generateMagicStoneFromItem id
+                MagicStoneManager.gainMagicStone MagicStoneManager.generateMagicStoneFromItem id
