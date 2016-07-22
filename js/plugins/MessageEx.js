@@ -27,13 +27,13 @@ this.Window_Message.prototype.convertEscapeCharacters = function(text) {
   text = _MessageEx_Alias_Window_Message_convertEscapeCharacters.apply(this, arguments);
   text = text.replace(/\x1bS/gi, function() {
     if (SceneManager._scene.nice_body) {
-      SceneManager._scene.nice_body.show();
+      SceneManager._scene.nice_body.slideIn();
     }
     return "";
   });
   text = text.replace(/\x1bH/gi, function() {
     if (SceneManager._scene.nice_body) {
-      SceneManager._scene.nice_body.hide();
+      SceneManager._scene.nice_body.slideOut();
     }
     return "";
   });

@@ -2,6 +2,7 @@
 /*:
   @plugindesc	Show the nice body of our character and her beautiful clothes.
   @author	ZumiKua
+
   @param	ORDER
   @desc	The order of the layer.First one is at the bottom.If the elements match
         the equipment type, the layer specified by the note <pic:#{picname}> will
@@ -9,26 +10,32 @@
         "express" means express layer.
         Use "|" to split the layer array.
   @default	backhair|nakedbody|Head|Body|fronthair|Accessory
+
   @param	ACTOR_ID
   @desc	The ID of actor who is displayed.
   @default	1
+
   @param EXPRESS_PREFIX
   @desc the prefix of express picture.
   @default exp_
+
   @param WIDTH
   @desc the width of pictures.
   @default 431
+
   @param HEIGHT
   @desc the height of pictures.
   @default 624
+
   @param HITTED_EXPRESS
   @desc EXPRESS WILL BE PLAYED WHEN HITTED BY ENEMIES
   @default hitted
+
   @param ATTACK_EXPRESS
   @desc Express will be played when actor attacks.
   @default 624
  */
-var _NiceBody_Alias_BattleManager_startAction, _NiceBody_Alias_Spriteset_Battle_createLowerLayer, _NiceBody_Alias_Spriteset_Battle_update, _Nicebody_Alias_Game_Interpreter_pluginCommand, _Nicebody_Alias_Scene_Map_createDisplayObjects, parameters,
+var _NiceBody_Alias_BattleManager_startAction, _NiceBody_Alias_Spriteset_Battle_createLowerLayer, _NiceBody_Alias_Spriteset_Battle_update, _Nicebody_Alias_Game_Interpreter_pluginCommand, _Nicebody_Alias_Scene_Map_createDisplayObjects, _Nicebody_Alias_Scene_Map_update, parameters,
   extend = function(child, parent) { for (var key in parent) { if (hasProp.call(parent, key)) child[key] = parent[key]; } function ctor() { this.constructor = child; } ctor.prototype = parent.prototype; child.prototype = new ctor(); child.__super__ = parent.prototype; return child; },
   hasProp = {}.hasOwnProperty;
 
@@ -89,13 +96,12 @@ this.Scene_Map.prototype.createDisplayObjects = function() {
   return this.addChildAt(this.nice_body, 1);
 };
 
+_Nicebody_Alias_Scene_Map_update = this.Scene_Map.prototype.update;
 
-/*
-_Nicebody_Alias_Scene_Map_update = @Scene_Map.prototype.update
-@Scene_Map.prototype.update = ()->
-  _Nicebody_Alias_Scene_Map_update.apply(this,arguments)
-  @nice_body.update()
- */
+this.Scene_Map.prototype.update = function() {
+  _Nicebody_Alias_Scene_Map_update.apply(this, arguments);
+  return this.nice_body.update();
+};
 
 parameters = PluginManager.parameters('NiceBody');
 
@@ -117,7 +123,7 @@ this.NiceBody = (function(superClass) {
     this.express_sprite_ids = [];
     this.pic_width = Number(parameters['WIDTH'] || 431);
     this.pic_height = Number(parameters['HEIGHT'] || 624);
-    this.x = Graphics.width - 160 + 80;
+    this.x = Graphics.width - 120 + 80;
     this.y = this.pic_height;
     this.refresh();
   }
@@ -253,8 +259,8 @@ this.NiceBody = (function(superClass) {
     if (this.showing) {
       this.x -= 5;
       this.opacity += 13;
-      if (this.x <= Graphics.width - 160) {
-        this.x = Graphics.width - 160;
+      if (this.x <= Graphics.width - 120) {
+        this.x = Graphics.width - 120;
         this.showing = false;
         this.opacity = 255;
       }
@@ -262,8 +268,8 @@ this.NiceBody = (function(superClass) {
     if (this.hiding) {
       this.x += 5;
       this.opacity -= 13;
-      if (this.x >= Graphics.width - 160 + 80) {
-        this.x = Graphics.width - 160 + 80;
+      if (this.x >= Graphics.width - 120 + 80) {
+        this.x = Graphics.width - 120 + 80;
         this.hiding = false;
         this.opacity = 0;
       }
@@ -281,14 +287,14 @@ this.NiceBody = (function(superClass) {
     this.hiding = false;
     this.showing = true;
     this.opacity = 0;
-    return this.x = Graphics.width - 160 + 80;
+    return this.x = Graphics.width - 120 + 80;
   };
 
   NiceBody.prototype.slideOut = function() {
     this.showing = false;
     this.hiding = true;
     this.opacity = 255;
-    return this.x = Graphics.width - 160;
+    return this.x = Graphics.width - 120;
   };
 
   return NiceBody;

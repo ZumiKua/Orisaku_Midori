@@ -1,6 +1,7 @@
 ###:
   @plugindesc	Show the nice body of our character and her beautiful clothes.
   @author	ZumiKua
+
   @param	ORDER
   @desc	The order of the layer.First one is at the bottom.If the elements match
         the equipment type, the layer specified by the note <pic:#{picname}> will
@@ -8,24 +9,31 @@
         "express" means express layer.
         Use "|" to split the layer array.
   @default	backhair|nakedbody|Head|Body|fronthair|Accessory
+
   @param	ACTOR_ID
   @desc	The ID of actor who is displayed.
   @default	1
+
   @param EXPRESS_PREFIX
   @desc the prefix of express picture.
   @default exp_
+
   @param WIDTH
   @desc the width of pictures.
   @default 431
+
   @param HEIGHT
   @desc the height of pictures.
   @default 624
+
   @param HITTED_EXPRESS
   @desc EXPRESS WILL BE PLAYED WHEN HITTED BY ENEMIES
   @default hitted
+
   @param ATTACK_EXPRESS
   @desc Express will be played when actor attacks.
   @default 624
+
 ###
 _NiceBody_Alias_BattleManager_startAction = @BattleManager.startAction
 @BattleManager.startAction = ()->
@@ -67,12 +75,12 @@ _Nicebody_Alias_Scene_Map_createDisplayObjects = @Scene_Map.prototype.createDisp
   _Nicebody_Alias_Scene_Map_createDisplayObjects.apply(this,arguments)
   @nice_body = new NiceBody()
   @addChildAt(@nice_body,1)
-###
+
 _Nicebody_Alias_Scene_Map_update = @Scene_Map.prototype.update
 @Scene_Map.prototype.update = ()->
   _Nicebody_Alias_Scene_Map_update.apply(this,arguments)
   @nice_body.update()
-###
+
 parameters = PluginManager.parameters('NiceBody');
 class @NiceBody extends @Sprite_Base
   constructor: ()->
@@ -89,7 +97,7 @@ class @NiceBody extends @Sprite_Base
     @express_sprite_ids = []
     @pic_width = Number(parameters['WIDTH'] || 431)
     @pic_height = Number(parameters['HEIGHT'] || 624)
-    @x = Graphics.width - 160 + 80
+    @x = Graphics.width - 120 + 80
     @y = @pic_height
     #@sprites = (new Sprite() for elem in @orders)
     #for sprite in @sprites
@@ -181,15 +189,15 @@ class @NiceBody extends @Sprite_Base
     if @showing
       @x -= 5
       @opacity += 13
-      if @x <= Graphics.width - 160
-        @x = Graphics.width - 160
+      if @x <= Graphics.width - 120
+        @x = Graphics.width - 120
         @showing = false
         @opacity = 255
     if @hiding
       @x += 5
       @opacity -= 13
-      if @x >= Graphics.width - 160 + 80
-        @x = Graphics.width - 160 + 80
+      if @x >= Graphics.width - 120 + 80
+        @x = Graphics.width - 120 + 80
         @hiding = false
         @opacity = 0
     if @back_to_normal_express
@@ -204,9 +212,9 @@ class @NiceBody extends @Sprite_Base
     @hiding = false
     @showing = true
     @opacity = 0
-    @x = Graphics.width - 160 + 80
+    @x = Graphics.width - 120 + 80
   slideOut: ()->
     @showing = false
     @hiding = true
     @opacity = 255
-    @x = Graphics.width - 160
+    @x = Graphics.width - 120
