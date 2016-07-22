@@ -78,7 +78,7 @@ class MagicStone
         this._energy = 0
         this._proficiency = proficiency
         this._maxProficiency = maxProficiency
-        this._energy += this.energyCost(skill_id) for skill_id in this._skills
+        @updateEnergy()
     
     mpCost: (skill) ->
         skill = $dataSkills[skill] if typeof skill == 'number'
@@ -93,23 +93,34 @@ class MagicStone
     energyCost: (skill) ->
         skill = $dataSkills[skill] if typeof skill == 'number'
         data = skill.meta.energyCost
-        return 1 if data == null || data == undefined
+        return skill.id if data == null || data == undefined
         parseInt data
 
-    transfer: (skill) ->
-        cost = energyCost skill
+    transferSkill: (skill) ->
+        skill = skill.id if typeof skill != 'number'
+        return false if !@canReceiveSkill
+        cost = @energyCost skill
         if this._energy + cost > this._maxEnergy
             return false
         else 
             this._energy += cost
-            this._skill.push skill
+            this._skills.push skill
             return true
 
+    canReceiveSkill: (skill) ->
+        true
+    
+    removeSkill: (skill) ->
+        skill = skill.id if typeof skill != 'number'
+        index = this._skills.indexOf skill
+        return -1 if index < 0
+        this._skills.splice index, 1
+
     proficiencyRatio: ->
-        this._proficiency / this._maxProficiency
+        Math.min 1, this._proficiency / this._maxProficiency
         
     energyRatio: ->
-        return this._energy / this._maxEnergy
+        Math.min 1, this._energy / this._maxEnergy
 
     predictedEnergyRatio: (skill) ->
         skill = $dataSkills[skill] if typeof skill == 'number'
@@ -121,7 +132,10 @@ class MagicStone
     isFull: ->
         return this._skills.length >= 7 or this._energy >= this._maxEnergy
 
-MagicStoneManager = ->
+    updateEnergy: ->
+        this._energy += this.energyCost(skill_id) for skill_id in this._skills
+
+@MagicStoneManager = ->
     throw new error "This is a static class"
 
 MagicStoneManager.generateMagicStoneFromItem = (itemIndex) ->
@@ -137,12 +151,34 @@ MagicStoneManager.generateMagicStoneFromItem = (itemIndex) ->
     new MagicStone name, level, factor, skills, maxEnergy, proficiency, maxProficiency
 
 MagicStoneManager.generateMagicStoneRandomly = (minLevel, maxLevel) ->
-
 MagicStoneManager.magicStones = ->
     $gameParty.magicStones()
 
 MagicStoneManager.gainMagicStone = (stone)->
     MagicStoneManager.magicStones().push stone
+MagicStoneManager.transferSkill = (fromStone, toStone, skill)->
+    result = toStone.transferSkill skill
+    return 'fail' if !result
+    return 'success' if MagicStoneParameters.transferType == 'copy'
+    fromStone.removeSkill skill
+    fromStone.updateEnergy()
+    switch MagicStoneParameters.destroyStoneWhen
+        when 'transferred' then return 'destroy transfer'
+        when 'clear'
+            if fromStone.isEmpty()
+                return 'destroy clear'
+            else 
+                return 'success'
+        when 'never' then return 'success'
+        else return 'destroy transfer'
+MagicStoneManager.canReceiveSkill = (toStone, skill)->
+    skill = skill.id if typeof skill != 'number'
+    return "refuse" if !toStone.canReceiveSkill skill
+    index = toStone._skills.indexOf skill
+    return "contains" if index >= 0
+    if MagicStoneParameters.showContentWhenTransfer == 'energy' or MagicStoneParameters.showContentWhenTransfer == 'both'
+        return "explosion" if toStone.predictedEnergyRatio(skill) > 1
+    return "ok"
 
 Game_Party.prototype.initAllItems = () ->
     this._MagicStone_Alias_initAllItems();
@@ -195,12 +231,13 @@ Window_Base.prototype.drawSkill = (line, width, skill, cost)->
 class Window_StoneList extends @Window_Selectable
     constructor: (x, y)->
         @initialize.call this, x, y, @windowWidth(), @windowHeight()
+        @owner = this
         @refresh()
     
     drawItem: (index) ->
         stone = @magicStoneAtIndex index
         return if stone == null || stone == undefined
-        @changePaintOpacity @isEnabled stone
+        @changePaintOpacity @isEnabled.call @owner, stone
         rect = @itemRectForText index
         @contents.drawText stone._name, rect.x, rect.y, rect.width, rect.height, 'left'
         @changePaintOpacity 1
@@ -312,7 +349,14 @@ class Window_TransferSkillList extends Window_Selectable
     drawItem: (index) ->
         return if @datas == null || @datas == undefined || @datas.length == 0
         skill = $dataSkills[@datas[index]]
+        @changePaintOpacity @itemEnabled index
         @drawSkill index, @contents.width, skill, @fromStone.mpCost skill
+        @changePaintOpacity 1
+
+    itemEnabled: (index)->
+        return true if !@toStone
+        skill = @skillAtIndex index
+        MagicStoneManager.canReceiveSkill(@toStone, skill) == 'ok'
 
     createHelpWindow: ->
         this._helpWindow = new Window_TransferSkillHelp 0, @height, @width
@@ -333,6 +377,7 @@ class Window_TransferSkillList extends Window_Selectable
 
     setStones: (fromStone, toStone)->
         @fromStone = fromStone
+        @toStone = toStone
         this._helpWindow.toStone = toStone
 
     open: ->
@@ -343,7 +388,7 @@ class Window_TransferSkillList extends Window_Selectable
     close: ->
         Window_Base.prototype.close.call this
         this._helpWindow.close()
-        this._titleWindow.close();
+        this._titleWindow.close()
 
 class Window_TransferSkillHelp extends Window_Base
     constructor: (x, y, width)->
@@ -371,13 +416,22 @@ class Window_TransferSkillHelp extends Window_Base
         return if !@skill or !@toStone
         @contents.clear()
         @focusLine = 0
-        switch MagicStoneParameters.showContentWhenTransfer
-            when 'mp' then @drawPredictedSkill()
-            when 'energy' then @drawPredictedEnergy()
-            when 'both'
-                @drawPredictedSkill()
-                @drawPredictedEnergy()
-
+        result = MagicStoneManager.canReceiveSkill @toStone, @skill
+        switch result
+            when 'refuse'
+                @setText "这块魔石不允许接收该技能。"
+            when 'contains'
+                @setText "这块魔石已经有这个技能了。"
+            else
+                switch MagicStoneParameters.showContentWhenTransfer
+                    when 'mp' then @drawPredictedSkill()
+                    when 'energy' then @drawPredictedEnergy()
+                    when 'both'
+                        @drawPredictedSkill()
+                        @drawPredictedEnergy()
+    setText: (text) ->
+        @progressBar.visible = false if @progressBar
+        @contents.drawText text, 0, (@contents.height - @lineHeight()) / 2, @contents.width, @lineHeight(), 'center'
     drawPredictedSkill: ->
         return if !@toStone
         @drawSkill @focusLine, @contents.width, @skill, @toStone.mpCost @skill
@@ -436,8 +490,8 @@ class @Scene_Transfer extends @Scene_Base
         @toStoneListWindow.setHandler 'ok', @onToListOK.bind this
         @toStoneListWindow.setHandler 'cancel', @onToListCancel.bind this
         @toStoneListWindow.isEnabled = (stone) ->
-            !(stone.isFull() && stone != @fromMagicStone)
-        @toStoneListWindow.isEnabled.bind this
+            !stone.isFull() && stone != @fromMagicStone
+        @toStoneListWindow.owner = this
         @toStoneListWindow.refresh()
         @addChild @toStoneListWindow
 
@@ -457,7 +511,7 @@ class @Scene_Transfer extends @Scene_Base
 
     update: ()->
         Scene_Base.prototype.update.call this
-        if @state == 'message'
+        if @state == 'message' or @state == 'progress'
             if Input.isRepeated('ok') or Input.isTriggered('cancel')
                 @onMessageWindowOK();
 
@@ -482,7 +536,11 @@ class @Scene_Transfer extends @Scene_Base
                 @fromStoneListWindow.deactivate()
                 @toStoneListWindow.deactivate()
                 @messageWindow.open()
-
+            when 'progress'
+                @lastState = 'from'
+                @toStoneListWindow.select -1
+                @skillListWindow.close()
+                @messageWindow.open()
         @state = state
 
     onFromListOk: ()->
@@ -491,12 +549,13 @@ class @Scene_Transfer extends @Scene_Base
             @setMessageWindow "这个魔石上没有刻录技能。"
             @switchState 'message'
         else
+            @toStoneListWindow.redrawItem @fromStoneListWindow.index()
             @switchState 'to'
 
-    onFromListCancel: ()->
+    onFromListCancel: ->
         SceneManager.goto(Scene_Map)
 
-    onToListOK: ()->
+    onToListOK: ->
         @toMagicStone = @toStoneListWindow.magicStoneChosen()
         if @toMagicStone == @fromMagicStone
             @setMessageWindow "这两者是同一块魔石。"
@@ -511,24 +570,62 @@ class @Scene_Transfer extends @Scene_Base
 
     onToListCancel: ()->
         @fromMagicStone = null
+        @toStoneListWindow.redrawItem @fromStoneListWindow.index()
         @toStoneListWindow.select -1
         @switchState 'from'
 
     onSkillListOK: ()->
+        skill = @skillListWindow.selectedSkill()
+        switch MagicStoneManager.canReceiveSkill(@toMagicStone, skill)
+            when 'explosion'
+                @setMessageWindow "这块魔石的剩余能量不足。"
+                @switchState 'message'
+            when 'refuse'
+                @setMessageWindow "这块魔石无法接收这个技能。"
+                @switchState 'message'
+            when 'contains'
+                @setMessageWindow "这块魔石已经有这个技能了。"
+                @switchState 'message'
+            when 'ok'
+                result = MagicStoneManager.transferSkill @fromMagicStone, @toMagicStone, skill
+                switch result
+                    when 'fail'
+                        if MagicStoneParameters.overEnergy == 'hint'
+                            @setMessageWindow "这块魔石的剩余能量不足。"
+                            @switchState 'message'
+                        else
+                            @destroyToMagicStone()
+                            @setMessageWindow "魔石的剩余能量不足，爆炸了……"
+                            @switchState 'progress'
+                    when 'success'
+                        @setMessageWindow "技能已经转录了。"
+                        @switchState 'progress'
+                    when 'destroy transfer'
+                        @destroySourceMagicStone()
+                        @setMessageWindow "技能已经转录了。\n来源的魔石化成了粉末。"
+                        @switchState 'progress'
+                    when 'destroy clear'
+                        @destroySourceMagicStone()
+                        @setMessageWindow "技能已经转录了。\n 来源的魔石化成了粉末。"
+                        @switchState 'progress'
 
-    onSkillListCancel: ()->
+    onSkillListCancel: ->
         @toMagicStone = null
         @skillListWindow.close()
         @switchState 'to'
 
-    onMessageWindowOK: ()->
+    onMessageWindowOK: ->
         @messageWindow.close()
         @switchState @lastState
 
-    setMessageWindow: (message)->
+    destroySourceMagicStone: ->
+    destroyToMagicStone: ->
+
+    setMessageWindow: (message, line)->
+        line = line || 1
         width = @messageWindow.textWidth message
         @messageWindow.width = width + @messageWindow.standardPadding() + 2 * @messageWindow.textPadding()
-        @messageWindow.height = @messageWindow.lineHeight() + 2 * @messageWindow.standardPadding()
+        @messageWindow.height = @messageWindow.lineHeight() * line + 2 * @messageWindow.standardPadding()
         @messageWindow.x = (Graphics.boxWidth - @messageWindow.width) / 2
         @messageWindow.y = (Graphics.boxHeight - @messageWindow.height) / 2
         @messageWindow.createContents()
@@ -540,7 +637,7 @@ Game_Interpreter.prototype.pluginCommand = (command, args) ->
     if command == 'MagicStone'
         switch args[0]
             when 'test'
-                $gameParty.magicStones().push new MagicStone "简单的石头", 1, 1.4, [6,7,8,9], 100, 60, 100
+                $gameParty.magicStones().push new MagicStone "简单的石头", 1, 1.4, [6,7,8,9], 35, 60, 100
                 $gameParty.magicStones().push new MagicStone "老旧的石头", 0, 2.5, [1,2,3,4,5], 5, 100, 100
             when 'fromItem'
                 idString = args[1]

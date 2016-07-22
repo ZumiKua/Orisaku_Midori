@@ -66,7 +66,7 @@
  */
 
 (function() {
-  var MagicStone, MagicStoneManager, MagicStoneParameters, Window_StoneHelp, Window_StoneList, Window_TransferSkillHelp, Window_TransferSkillList,
+  var MagicStone, MagicStoneParameters, Window_StoneHelp, Window_StoneList, Window_TransferSkillHelp, Window_TransferSkillList,
     __hasProp = {}.hasOwnProperty,
     __extends = function(child, parent) { for (var key in parent) { if (__hasProp.call(parent, key)) child[key] = parent[key]; } function ctor() { this.constructor = child; } ctor.prototype = parent.prototype; child.prototype = new ctor(); child.__super__ = parent.prototype; return child; };
 
@@ -78,7 +78,6 @@
 
   MagicStone = (function() {
     function MagicStone(name, level, factor, skills, maxEnergy, proficiency, maxProficiency) {
-      var skill_id, _i, _len, _ref;
       this._name = name;
       this._level = level;
       this._magicFactor = factor;
@@ -87,11 +86,7 @@
       this._energy = 0;
       this._proficiency = proficiency;
       this._maxProficiency = maxProficiency;
-      _ref = this._skills;
-      for (_i = 0, _len = _ref.length; _i < _len; _i++) {
-        skill_id = _ref[_i];
-        this._energy += this.energyCost(skill_id);
-      }
+      this.updateEnergy();
     }
 
     MagicStone.prototype.mpCost = function(skill) {
@@ -121,29 +116,51 @@
       }
       data = skill.meta.energyCost;
       if (data === null || data === void 0) {
-        return 1;
+        return skill.id;
       }
       return parseInt(data);
     };
 
-    MagicStone.prototype.transfer = function(skill) {
+    MagicStone.prototype.transferSkill = function(skill) {
       var cost;
-      cost = energyCost(skill);
+      if (typeof skill !== 'number') {
+        skill = skill.id;
+      }
+      if (!this.canReceiveSkill) {
+        return false;
+      }
+      cost = this.energyCost(skill);
       if (this._energy + cost > this._maxEnergy) {
         return false;
       } else {
         this._energy += cost;
-        this._skill.push(skill);
+        this._skills.push(skill);
         return true;
       }
     };
 
+    MagicStone.prototype.canReceiveSkill = function(skill) {
+      return true;
+    };
+
+    MagicStone.prototype.removeSkill = function(skill) {
+      var index;
+      if (typeof skill !== 'number') {
+        skill = skill.id;
+      }
+      index = this._skills.indexOf(skill);
+      if (index < 0) {
+        return -1;
+      }
+      return this._skills.splice(index, 1);
+    };
+
     MagicStone.prototype.proficiencyRatio = function() {
-      return this._proficiency / this._maxProficiency;
+      return Math.min(1, this._proficiency / this._maxProficiency);
     };
 
     MagicStone.prototype.energyRatio = function() {
-      return this._energy / this._maxEnergy;
+      return Math.min(1, this._energy / this._maxEnergy);
     };
 
     MagicStone.prototype.predictedEnergyRatio = function(skill) {
@@ -161,11 +178,22 @@
       return this._skills.length >= 7 || this._energy >= this._maxEnergy;
     };
 
+    MagicStone.prototype.updateEnergy = function() {
+      var skill_id, _i, _len, _ref, _results;
+      _ref = this._skills;
+      _results = [];
+      for (_i = 0, _len = _ref.length; _i < _len; _i++) {
+        skill_id = _ref[_i];
+        _results.push(this._energy += this.energyCost(skill_id));
+      }
+      return _results;
+    };
+
     return MagicStone;
 
   })();
 
-  MagicStoneManager = function() {
+  this.MagicStoneManager = function() {
     throw new error("This is a static class");
   };
 
@@ -191,6 +219,54 @@
 
   MagicStoneManager.gainMagicStone = function(stone) {
     return MagicStoneManager.magicStones().push(stone);
+  };
+
+  MagicStoneManager.transferSkill = function(fromStone, toStone, skill) {
+    var result;
+    result = toStone.transferSkill(skill);
+    if (!result) {
+      return 'fail';
+    }
+    if (MagicStoneParameters.transferType === 'copy') {
+      return 'success';
+    }
+    fromStone.removeSkill(skill);
+    fromStone.updateEnergy();
+    switch (MagicStoneParameters.destroyStoneWhen) {
+      case 'transferred':
+        return 'destroy transfer';
+      case 'clear':
+        if (fromStone.isEmpty()) {
+          return 'destroy clear';
+        } else {
+          return 'success';
+        }
+        break;
+      case 'never':
+        return 'success';
+      default:
+        return 'destroy transfer';
+    }
+  };
+
+  MagicStoneManager.canReceiveSkill = function(toStone, skill) {
+    var index;
+    if (typeof skill !== 'number') {
+      skill = skill.id;
+    }
+    if (!toStone.canReceiveSkill(skill)) {
+      return "refuse";
+    }
+    index = toStone._skills.indexOf(skill);
+    if (index >= 0) {
+      return "contains";
+    }
+    if (MagicStoneParameters.showContentWhenTransfer === 'energy' || MagicStoneParameters.showContentWhenTransfer === 'both') {
+      if (toStone.predictedEnergyRatio(skill) > 1) {
+        return "explosion";
+      }
+    }
+    return "ok";
   };
 
   Game_Party.prototype.initAllItems = function() {
@@ -270,6 +346,7 @@
 
     function Window_StoneList(x, y) {
       this.initialize.call(this, x, y, this.windowWidth(), this.windowHeight());
+      this.owner = this;
       this.refresh();
     }
 
@@ -279,7 +356,7 @@
       if (stone === null || stone === void 0) {
         return;
       }
-      this.changePaintOpacity(this.isEnabled(stone));
+      this.changePaintOpacity(this.isEnabled.call(this.owner, stone));
       rect = this.itemRectForText(index);
       this.contents.drawText(stone._name, rect.x, rect.y, rect.width, rect.height, 'left');
       return this.changePaintOpacity(1);
@@ -443,7 +520,18 @@
         return;
       }
       skill = $dataSkills[this.datas[index]];
-      return this.drawSkill(index, this.contents.width, skill, this.fromStone.mpCost(skill));
+      this.changePaintOpacity(this.itemEnabled(index));
+      this.drawSkill(index, this.contents.width, skill, this.fromStone.mpCost(skill));
+      return this.changePaintOpacity(1);
+    };
+
+    Window_TransferSkillList.prototype.itemEnabled = function(index) {
+      var skill;
+      if (!this.toStone) {
+        return true;
+      }
+      skill = this.skillAtIndex(index);
+      return MagicStoneManager.canReceiveSkill(this.toStone, skill) === 'ok';
     };
 
     Window_TransferSkillList.prototype.createHelpWindow = function() {
@@ -473,6 +561,7 @@
 
     Window_TransferSkillList.prototype.setStones = function(fromStone, toStone) {
       this.fromStone = fromStone;
+      this.toStone = toStone;
       return this._helpWindow.toStone = toStone;
     };
 
@@ -534,20 +623,36 @@
     };
 
     Window_TransferSkillHelp.prototype.refresh = function() {
+      var result;
       if (!this.skill || !this.toStone) {
         return;
       }
       this.contents.clear();
       this.focusLine = 0;
-      switch (MagicStoneParameters.showContentWhenTransfer) {
-        case 'mp':
-          return this.drawPredictedSkill();
-        case 'energy':
-          return this.drawPredictedEnergy();
-        case 'both':
-          this.drawPredictedSkill();
-          return this.drawPredictedEnergy();
+      result = MagicStoneManager.canReceiveSkill(this.toStone, this.skill);
+      switch (result) {
+        case 'refuse':
+          return this.setText("这块魔石不允许接收该技能。");
+        case 'contains':
+          return this.setText("这块魔石已经有这个技能了。");
+        default:
+          switch (MagicStoneParameters.showContentWhenTransfer) {
+            case 'mp':
+              return this.drawPredictedSkill();
+            case 'energy':
+              return this.drawPredictedEnergy();
+            case 'both':
+              this.drawPredictedSkill();
+              return this.drawPredictedEnergy();
+          }
       }
+    };
+
+    Window_TransferSkillHelp.prototype.setText = function(text) {
+      if (this.progressBar) {
+        this.progressBar.visible = false;
+      }
+      return this.contents.drawText(text, 0, (this.contents.height - this.lineHeight()) / 2, this.contents.width, this.lineHeight(), 'center');
     };
 
     Window_TransferSkillHelp.prototype.drawPredictedSkill = function() {
@@ -631,9 +736,9 @@
       this.toStoneListWindow.setHandler('ok', this.onToListOK.bind(this));
       this.toStoneListWindow.setHandler('cancel', this.onToListCancel.bind(this));
       this.toStoneListWindow.isEnabled = function(stone) {
-        return !(stone.isFull() && stone !== this.fromMagicStone);
+        return !stone.isFull() && stone !== this.fromMagicStone;
       };
-      this.toStoneListWindow.isEnabled.bind(this);
+      this.toStoneListWindow.owner = this;
       this.toStoneListWindow.refresh();
       return this.addChild(this.toStoneListWindow);
     };
@@ -656,7 +761,7 @@
 
     Scene_Transfer.prototype.update = function() {
       Scene_Base.prototype.update.call(this);
-      if (this.state === 'message') {
+      if (this.state === 'message' || this.state === 'progress') {
         if (Input.isRepeated('ok') || Input.isTriggered('cancel')) {
           return this.onMessageWindowOK();
         }
@@ -691,6 +796,12 @@
           this.fromStoneListWindow.deactivate();
           this.toStoneListWindow.deactivate();
           this.messageWindow.open();
+          break;
+        case 'progress':
+          this.lastState = 'from';
+          this.toStoneListWindow.select(-1);
+          this.skillListWindow.close();
+          this.messageWindow.open();
       }
       return this.state = state;
     };
@@ -701,6 +812,7 @@
         this.setMessageWindow("这个魔石上没有刻录技能。");
         return this.switchState('message');
       } else {
+        this.toStoneListWindow.redrawItem(this.fromStoneListWindow.index());
         return this.switchState('to');
       }
     };
@@ -726,11 +838,51 @@
 
     Scene_Transfer.prototype.onToListCancel = function() {
       this.fromMagicStone = null;
+      this.toStoneListWindow.redrawItem(this.fromStoneListWindow.index());
       this.toStoneListWindow.select(-1);
       return this.switchState('from');
     };
 
-    Scene_Transfer.prototype.onSkillListOK = function() {};
+    Scene_Transfer.prototype.onSkillListOK = function() {
+      var result, skill;
+      skill = this.skillListWindow.selectedSkill();
+      switch (MagicStoneManager.canReceiveSkill(this.toMagicStone, skill)) {
+        case 'explosion':
+          this.setMessageWindow("这块魔石的剩余能量不足。");
+          return this.switchState('message');
+        case 'refuse':
+          this.setMessageWindow("这块魔石无法接收这个技能。");
+          return this.switchState('message');
+        case 'contains':
+          this.setMessageWindow("这块魔石已经有这个技能了。");
+          return this.switchState('message');
+        case 'ok':
+          result = MagicStoneManager.transferSkill(this.fromMagicStone, this.toMagicStone, skill);
+          switch (result) {
+            case 'fail':
+              if (MagicStoneParameters.overEnergy === 'hint') {
+                this.setMessageWindow("这块魔石的剩余能量不足。");
+                return this.switchState('message');
+              } else {
+                this.destroyToMagicStone();
+                this.setMessageWindow("魔石的剩余能量不足，爆炸了……");
+                return this.switchState('progress');
+              }
+              break;
+            case 'success':
+              this.setMessageWindow("技能已经转录了。");
+              return this.switchState('progress');
+            case 'destroy transfer':
+              this.destroySourceMagicStone();
+              this.setMessageWindow("技能已经转录了。\n来源的魔石化成了粉末。");
+              return this.switchState('progress');
+            case 'destroy clear':
+              this.destroySourceMagicStone();
+              this.setMessageWindow("技能已经转录了。\n 来源的魔石化成了粉末。");
+              return this.switchState('progress');
+          }
+      }
+    };
 
     Scene_Transfer.prototype.onSkillListCancel = function() {
       this.toMagicStone = null;
@@ -743,11 +895,16 @@
       return this.switchState(this.lastState);
     };
 
-    Scene_Transfer.prototype.setMessageWindow = function(message) {
+    Scene_Transfer.prototype.destroySourceMagicStone = function() {};
+
+    Scene_Transfer.prototype.destroyToMagicStone = function() {};
+
+    Scene_Transfer.prototype.setMessageWindow = function(message, line) {
       var width;
+      line = line || 1;
       width = this.messageWindow.textWidth(message);
       this.messageWindow.width = width + this.messageWindow.standardPadding() + 2 * this.messageWindow.textPadding();
-      this.messageWindow.height = this.messageWindow.lineHeight() + 2 * this.messageWindow.standardPadding();
+      this.messageWindow.height = this.messageWindow.lineHeight() * line + 2 * this.messageWindow.standardPadding();
       this.messageWindow.x = (Graphics.boxWidth - this.messageWindow.width) / 2;
       this.messageWindow.y = (Graphics.boxHeight - this.messageWindow.height) / 2;
       this.messageWindow.createContents();
@@ -764,7 +921,7 @@
     if (command === 'MagicStone') {
       switch (args[0]) {
         case 'test':
-          $gameParty.magicStones().push(new MagicStone("简单的石头", 1, 1.4, [6, 7, 8, 9], 100, 60, 100));
+          $gameParty.magicStones().push(new MagicStone("简单的石头", 1, 1.4, [6, 7, 8, 9], 35, 60, 100));
           return $gameParty.magicStones().push(new MagicStone("老旧的石头", 0, 2.5, [1, 2, 3, 4, 5], 5, 100, 100));
         case 'fromItem':
           idString = args[1];
