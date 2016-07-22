@@ -4948,6 +4948,7 @@ Window_BattleLog.prototype.showAnimation = function(subject, targets, animationI
     if (animationId < 0) {
         this.showAttackAnimation(subject, targets);
     } else {
+
         this.showNormalAnimation(targets, animationId);
     }
 };
