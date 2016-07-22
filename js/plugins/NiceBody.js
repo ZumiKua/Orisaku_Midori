@@ -35,7 +35,7 @@
   @desc Express will be played when actor attacks.
   @default 624
  */
-var _NiceBody_Alias_BattleManager_startAction, _NiceBody_Alias_Spriteset_Battle_createLowerLayer, _NiceBody_Alias_Spriteset_Battle_update, _Nicebody_Alias_Game_Interpreter_pluginCommand, _Nicebody_Alias_Scene_Map_createDisplayObjects, _Nicebody_Alias_Scene_Map_update, parameters,
+var _NiceBody_Alias_BattleManager_startAction, _NiceBody_Alias_Spriteset_Battle_createLowerLayer, _NiceBody_Alias_Spriteset_Battle_update, _Nicebody_Alias_Game_Interpreter_pluginCommand, _Nicebody_Alias_Scene_Map_createDisplayObjects, parameters,
   extend = function(child, parent) { for (var key in parent) { if (hasProp.call(parent, key)) child[key] = parent[key]; } function ctor() { this.constructor = child; } ctor.prototype = parent.prototype; child.prototype = new ctor(); child.__super__ = parent.prototype; return child; },
   hasProp = {}.hasOwnProperty;
 
@@ -96,12 +96,13 @@ this.Scene_Map.prototype.createDisplayObjects = function() {
   return this.addChildAt(this.nice_body, 1);
 };
 
-_Nicebody_Alias_Scene_Map_update = this.Scene_Map.prototype.update;
 
-this.Scene_Map.prototype.update = function() {
-  _Nicebody_Alias_Scene_Map_update.apply(this, arguments);
-  return this.nice_body.update();
-};
+/*
+_Nicebody_Alias_Scene_Map_update = @Scene_Map.prototype.update
+@Scene_Map.prototype.update = ()->
+  _Nicebody_Alias_Scene_Map_update.apply(this,arguments)
+  @nice_body.update()
+ */
 
 parameters = PluginManager.parameters('NiceBody');
 
@@ -257,8 +258,8 @@ this.NiceBody = (function(superClass) {
       this.old_express = this.express;
     }
     if (this.showing) {
-      this.x -= 5;
-      this.opacity += 13;
+      this.x -= 10;
+      this.opacity += 25;
       if (this.x <= Graphics.width - 120) {
         this.x = Graphics.width - 120;
         this.showing = false;
@@ -266,8 +267,8 @@ this.NiceBody = (function(superClass) {
       }
     }
     if (this.hiding) {
-      this.x += 5;
-      this.opacity -= 13;
+      this.x += 10;
+      this.opacity -= 25;
       if (this.x >= Graphics.width - 120 + 80) {
         this.x = Graphics.width - 120 + 80;
         this.hiding = false;

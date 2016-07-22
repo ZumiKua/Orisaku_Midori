@@ -75,12 +75,12 @@ _Nicebody_Alias_Scene_Map_createDisplayObjects = @Scene_Map.prototype.createDisp
   _Nicebody_Alias_Scene_Map_createDisplayObjects.apply(this,arguments)
   @nice_body = new NiceBody()
   @addChildAt(@nice_body,1)
-
+###
 _Nicebody_Alias_Scene_Map_update = @Scene_Map.prototype.update
 @Scene_Map.prototype.update = ()->
   _Nicebody_Alias_Scene_Map_update.apply(this,arguments)
   @nice_body.update()
-
+###
 parameters = PluginManager.parameters('NiceBody');
 class @NiceBody extends @Sprite_Base
   constructor: ()->
@@ -187,15 +187,15 @@ class @NiceBody extends @Sprite_Base
       @refresh()
       @old_express = @express
     if @showing
-      @x -= 5
-      @opacity += 13
+      @x -= 10
+      @opacity += 25
       if @x <= Graphics.width - 120
         @x = Graphics.width - 120
         @showing = false
         @opacity = 255
     if @hiding
-      @x += 5
-      @opacity -= 13
+      @x += 10
+      @opacity -= 25
       if @x >= Graphics.width - 120 + 80
         @x = Graphics.width - 120 + 80
         @hiding = false
