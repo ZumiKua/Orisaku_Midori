@@ -5,5 +5,6 @@ var $plugins =
 {"name":"NiceBody","status":true,"description":"Show the nice body of our character and her beautiful clothes.","parameters":{"ORDER":"nakedbody|v[50]|express,back|v[51]|express,front|Body|Head","ACTOR_ID":"1","EXPRESS_PREFIX":"exp_"}},
 {"name":"SkipPartyCommand","status":true,"description":"skip the command choose fight or escape on battle.","parameters":{}},
 {"name":"BattleUIAdjustment","status":true,"description":"Adjust the Battle UI positions.","parameters":{}},
-{"name":"MessageEx","status":true,"description":"","parameters":{}}
+{"name":"MessageEx","status":true,"description":"","parameters":{}},
+{"name":"CraftSystem","status":true,"description":"","parameters":{}}
 ];
