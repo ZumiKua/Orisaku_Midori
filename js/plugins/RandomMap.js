@@ -6,10 +6,19 @@
  */
 
 (function() {
-  var Point, RandomMapManager;
+  var Point, RandomMapManager, c, data, file, generate;
 
   Math.randomInt = function(min, max) {
     return Math.floor(Math.random() * (max - min + 1)) + min;
+  };
+
+  Array.prototype.fill = function(num) {
+    var i, _i, _ref, _results;
+    _results = [];
+    for (i = _i = 0, _ref = this.length - 1; 0 <= _ref ? _i <= _ref : _i >= _ref; i = 0 <= _ref ? ++_i : --_i) {
+      _results.push(this[i] = num);
+    }
+    return _results;
   };
 
   Point = (function() {
@@ -26,45 +35,49 @@
     throw new error("This is a static clss");
   };
 
-  RandomMapManager.constant_surroudings = [[-1, 0], [1, 0], [0, -1], [0, 1]];
+  RandomMapManager.Prim = function() {
+    throw new error("This is a static class");
+  };
 
-  RandomMapManager.constant_pass = 0;
+  RandomMapManager.constantSurroudings = [[-1, 0], [1, 0], [0, -1], [0, 1]];
 
-  RandomMapManager.constant_wall = 1;
+  RandomMapManager.constantPass = 0;
 
-  RandomMapManager.generateRandomStructureByPrim = function(width, height) {
+  RandomMapManager.constantWall = 1;
+
+  RandomMapManager.Prim.generateRandomStructure = function(width, height) {
     var actualHeight, actualWidth, map, mirror, movement, road, starter, starterX, starterY, wall, wallIndex, walls, _i, _len, _ref;
     actualWidth = width * 2 + 1;
     actualHeight = height * 2 + 1;
-    map = this.generateArray(actualWidth, actualHeight);
+    map = RandomMapManager.generateArray(actualWidth, actualHeight);
     walls = [];
     starterX = Math.randomInt(1, width - 1);
     starterY = Math.randomInt(1, height - 1);
     starter = new Point(2 * starterX - 1, 2 * starterY - 1);
-    map[starter.y][starter.x] = RandomMapManager.constant_pass;
+    map[starter.y][starter.x] = RandomMapManager.constantPass;
     walls = walls.concat(RandomMapManager.surroundingWalls(starter.x, starter.y, actualWidth, actualHeight, map));
     while (walls.length > 0) {
       wallIndex = Math.randomInt(0, walls.length - 1);
       wall = walls[wallIndex];
-      _ref = RandomMapManager.constant_surroudings;
+      _ref = RandomMapManager.constantSurroudings;
       for (_i = 0, _len = _ref.length; _i < _len; _i++) {
         movement = _ref[_i];
         road = new Point(wall.x + movement[0], wall.y + movement[1]);
         if (RandomMapManager.outTheBoard(road.x, road.y, actualWidth, actualHeight)) {
           continue;
         }
-        if (map[road.y][road.x] === RandomMapManager.constant_wall) {
+        if (map[road.y][road.x] === RandomMapManager.constantWall) {
           continue;
         }
         mirror = new Point(wall.x - movement[0], wall.y - movement[1]);
         if (RandomMapManager.outTheBoard(mirror.x, mirror.y, actualWidth, actualHeight)) {
           continue;
         }
-        if (map[mirror.y][mirror.x] === RandomMapManager.constant_pass) {
+        if (map[mirror.y][mirror.x] === RandomMapManager.constantPass) {
           continue;
         }
-        map[wall.y][wall.x] = RandomMapManager.constant_pass;
-        map[mirror.y][mirror.x] = RandomMapManager.constant_pass;
+        map[wall.y][wall.x] = RandomMapManager.constantPass;
+        map[mirror.y][mirror.x] = RandomMapManager.constantPass;
         walls = walls.concat(RandomMapManager.surroundingWalls(mirror.x, mirror.y, actualWidth, actualHeight, map));
       }
       walls.splice(wallIndex, 1);
@@ -76,7 +89,7 @@
     var arr, i, _i;
     arr = [];
     for (i = _i = 1; 1 <= height ? _i <= height : _i >= height; i = 1 <= height ? ++_i : --_i) {
-      arr.push(new Array(width).fill(RandomMapManager.constant_wall));
+      arr.push(new Array(width).fill(RandomMapManager.constantWall));
     }
     return arr;
   };
@@ -95,7 +108,7 @@
     if (RandomMapManager.outTheBoard(x, y, width, height, map)) {
       return false;
     }
-    return map[y][x] === RandomMapManager.constant_wall;
+    return map[y][x] === RandomMapManager.constantWall;
   };
 
   RandomMapManager.surroundingWalls = function(x, y, width, height, map) {
@@ -116,6 +129,236 @@
     return arr;
   };
 
-  console.log(RandomMapManager.generateRandomStructureByPrim(10, 10));
+  RandomMapManager.constantAreaWall = 0;
+
+  RandomMapManager.constantAreaHorizontal = 1;
+
+  RandomMapManager.constantAreaLongitudinal = 2;
+
+  RandomMapManager.constantAreaLeftToUp = 3;
+
+  RandomMapManager.constantAreaLeftToDown = 4;
+
+  RandomMapManager.constantAreaRightToUp = 5;
+
+  RandomMapManager.constantAreaRightToDown = 6;
+
+  RandomMapManager.constantAreaExceptLeft = 7;
+
+  RandomMapManager.constantAreaExceptDown = 8;
+
+  RandomMapManager.constantAreaExceptUp = 9;
+
+  RandomMapManager.constantAreaExceptRight = 10;
+
+  RandomMapManager.constantAreaCross = 11;
+
+  RandomMapManager.constantAreaToLeftDead = 12;
+
+  RandomMapManager.constantAreaToRightDead = 13;
+
+  RandomMapManager.constantAreaToUpDead = 14;
+
+  RandomMapManager.constantAreaToDownDead = 15;
+
+  RandomMapManager.constantAreaExit = 16;
+
+  RandomMapManager.constantAreaEntrance = 17;
+
+  RandomMapManager.convertStructureToAreaId = function(map) {
+    var actualHeight, actualWidth, area, areaId, height, i, j, passCount, passes, surrounding, surroundingX, surroundingY, surroundings, width, x, y, _i, _j, _k, _len, _ref;
+    height = map.length;
+    width = map[0].length;
+    actualHeight = (height - 1) / 2;
+    actualWidth = (width - 1) / 2;
+    area = RandomMapManager.generateArray(actualWidth, actualHeight);
+    for (i = _i = 1; 1 <= actualWidth ? _i <= actualWidth : _i >= actualWidth; i = 1 <= actualWidth ? ++_i : --_i) {
+      for (j = _j = 1; 1 <= actualHeight ? _j <= actualHeight : _j >= actualHeight; j = 1 <= actualHeight ? ++_j : --_j) {
+        x = 2 * i - 1;
+        y = 2 * j - 1;
+        if (map[y][x] === RandomMapManager.constantWall) {
+          throw new error("A Wall");
+        }
+        surroundings = [];
+        passCount = 0;
+        _ref = RandomMapManager.constantSurroudings;
+        for (_k = 0, _len = _ref.length; _k < _len; _k++) {
+          surrounding = _ref[_k];
+          surroundingX = x + surrounding[0];
+          surroundingY = y + surrounding[1];
+          passes = map[surroundingY][surroundingX];
+          if (passes === RandomMapManager.constantPass) {
+            passCount += 1;
+          }
+          surroundings.push(passes);
+        }
+        areaId = RandomMapManager.constantAreaWall;
+        switch (passCount) {
+          case 4:
+            areaId = RandomMapManager.constantAreaCross;
+            break;
+          case 3:
+            if (surroundings[0] === RandomMapManager.constantWall) {
+              areaId = RandomMapManager.constantAreaExceptLeft;
+            } else if (surroundings[1] === RandomMapManager.constantWall) {
+              areaId = RandomMapManager.constantAreaExceptRight;
+            } else if (surroundings[2] === RandomMapManager.constantWall) {
+              areaId = RandomMapManager.constantAreaExceptUp;
+            } else if (surroundings[3] === RandomMapManager.constantWall) {
+              areaId = RandomMapManager.constantAreaExceptDown;
+            }
+            break;
+          case 2:
+            if ((surroundings[0] === RandomMapManager.constantPass) && (surroundings[1] === RandomMapManager.constantPass)) {
+              areaId = RandomMapManager.constantAreaHorizontal;
+            }
+            if ((surroundings[0] === RandomMapManager.constantPass) && (surroundings[2] === RandomMapManager.constantPass)) {
+              areaId = RandomMapManager.constantAreaLeftToUp;
+            }
+            if ((surroundings[0] === RandomMapManager.constantPass) && (surroundings[3] === RandomMapManager.constantPass)) {
+              areaId = RandomMapManager.constantAreaLeftToDown;
+            }
+            if ((surroundings[1] === RandomMapManager.constantPass) && (surroundings[2] === RandomMapManager.constantPass)) {
+              areaId = RandomMapManager.constantAreaRightToUp;
+            }
+            if ((surroundings[1] === RandomMapManager.constantPass) && (surroundings[3] === RandomMapManager.constantPass)) {
+              areaId = RandomMapManager.constantAreaRightToDown;
+            }
+            if ((surroundings[2] === RandomMapManager.constantPass) && (surroundings[3] === RandomMapManager.constantPass)) {
+              areaId = RandomMapManager.constantAreaLongitudinal;
+            }
+            break;
+          case 1:
+            if (surroundings[0] === RandomMapManager.constantPass) {
+              areaId = RandomMapManager.constantAreaToRightDead;
+            } else if (surroundings[1] === RandomMapManager.constantPass) {
+              areaId = RandomMapManager.constantAreaToLeftDead;
+            } else if (surroundings[2] === RandomMapManager.constantPass) {
+              areaId = RandomMapManager.constantAreaToDownDead;
+            } else if (surroundings[3] === RandomMapManager.constantPass) {
+              areaId = RandomMapManager.constantAreaToUpDead;
+            }
+        }
+        area[j - 1][i - 1] = areaId;
+      }
+    }
+    return area;
+  };
+
+  RandomMapManager.MapSource = (function() {
+    function MapSource(dataMap) {
+      this.width = dataMap.width;
+      this.height = dataMap.height;
+      this.blockWidth = 5;
+      this.blockHeight = 5;
+      this.mapElements = {};
+      this.data = dataMap.data;
+      this.analyzeMap(this.data);
+    }
+
+    MapSource.prototype.analyzeMap = function(data) {
+      var area, border, index, offset, _results;
+      offset = this.width * this.height * 5;
+      index = offset;
+      _results = [];
+      while (index <= this.width * this.height * 6) {
+        if (index % this.width === 0 && border) {
+          index = border + 1;
+        }
+        while (data[index] === 0) {
+          index += 1;
+        }
+        area = data[index];
+        border = index + this.blockWidth + (this.blockHeight - 1) * this.width - 1;
+        if (data[border] !== area) {
+          index += 1;
+          continue;
+        }
+        if (!this.mapElements[area]) {
+          this.mapElements[area] = [];
+        }
+        this.mapElements[area].push(index - offset);
+        _results.push(index += this.blockWidth);
+      }
+      return _results;
+    };
+
+    MapSource.prototype.getMapData = function(data, x, y, z) {
+      return data[this.width * this.height * z + y * this.width + x];
+    };
+
+    MapSource.prototype.copyMapData = function(sourceStartIndex, receiver, receiverStartX, receiverStartY, receiverMapWidth, receiverMapHeight, zRange) {
+      var i, j, offset, receiverBase, sourceBase, z, _i, _j, _k, _len, _ref, _ref1;
+      zRange = zRange || [0, 1, 2, 3, 4];
+      offset = receiverStartY * receiverMapWidth + receiverStartX;
+      for (_i = 0, _len = zRange.length; _i < _len; _i++) {
+        z = zRange[_i];
+        sourceBase = sourceStartIndex + z * this.width * this.height;
+        receiverBase = z * receiverMapWidth * receiverMapHeight + offset;
+        for (j = _j = 0, _ref = this.blockHeight - 1; 0 <= _ref ? _j <= _ref : _j >= _ref; j = 0 <= _ref ? ++_j : --_j) {
+          for (i = _k = 0, _ref1 = this.blockWidth - 1; 0 <= _ref1 ? _k <= _ref1 : _k >= _ref1; i = 0 <= _ref1 ? ++_k : --_k) {
+            receiver[receiverBase + j * receiverMapHeight + i] = this.data[sourceBase + j * this.width + i];
+          }
+        }
+      }
+      return 0;
+    };
+
+    MapSource.prototype.generateMap = function(sourceData, mapData, mapWidth, mapHeight) {
+      var areaId, choices, height, i, j, startIndex, width, _i, _j, _ref, _ref1;
+      height = sourceData.length;
+      width = sourceData[0].length;
+      for (j = _i = 0, _ref = height - 1; 0 <= _ref ? _i <= _ref : _i >= _ref; j = 0 <= _ref ? ++_i : --_i) {
+        for (i = _j = 0, _ref1 = width - 1; 0 <= _ref1 ? _j <= _ref1 : _j >= _ref1; i = 0 <= _ref1 ? ++_j : --_j) {
+          areaId = sourceData[j][i];
+          choices = this.mapElements[areaId];
+          if (!choices) {
+            continue;
+          }
+          startIndex = choices[Math.randomInt(0, choices.length - 1)];
+          this.copyMapData(startIndex, mapData, i * this.blockWidth, j * this.blockHeight, mapWidth, mapHeight);
+        }
+      }
+      return 0;
+    };
+
+    return MapSource;
+
+  })();
+
+  RandomMapManager.MapSource.loadMap = function(id) {
+    var fileName;
+    if (typeof id !== 'string') {
+      id = id.padZero(3);
+    }
+    fileName = "Map" + id + ".json";
+    return DataManager.loadDataFile('$lastAnalyzedFile', fileName);
+  };
+
+  RandomMapManager.MapSource.loadMapByFs = function(id) {
+    var fileName, fs;
+    if (typeof id !== 'string') {
+      id = id.padZero(3);
+    }
+    fileName = "../Data/Map" + id + ".json";
+    fs = require('fs');
+    return fs.readFileSync(fileName).toString();
+  };
+
+  this.RandomMapManager = RandomMapManager;
+
+  file = RandomMapManager.MapSource.loadMapByFs("002");
+
+  data = JSON.parse(file);
+
+  c = new RandomMapManager.MapSource(data);
+
+  generate = RandomMapManager.convertStructureToAreaId(RandomMapManager.Prim.generateRandomStructure(10, 10));
+
+  data = new Array(2500);
+
+  c.generateMap(generate, data, 50, 50);
+
+  console.log(data);
 
 }).call(this);
