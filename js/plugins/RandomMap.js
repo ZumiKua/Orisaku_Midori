@@ -6,19 +6,18 @@
  */
 
 (function() {
-  var Point, RandomMapManager, c, data, file, generate;
+  var Point, RandomMapManager, _RandomMap_Alias_Game_Interpreter_command201, _RandomMap_Alias_Game_Interpreter_pluginCommand, _RandomMap_Alias_Scene_Map_isReady, _RandomMap_Alias_Scene_Map_onMapLoaded;
 
   Math.randomInt = function(min, max) {
     return Math.floor(Math.random() * (max - min + 1)) + min;
   };
 
   Array.prototype.fill = function(num) {
-    var i, _i, _ref, _results;
-    _results = [];
+    var i, _i, _ref;
     for (i = _i = 0, _ref = this.length - 1; 0 <= _ref ? _i <= _ref : _i >= _ref; i = 0 <= _ref ? ++_i : --_i) {
-      _results.push(this[i] = num);
+      this[i] = num;
     }
-    return _results;
+    return this;
   };
 
   Point = (function() {
@@ -44,6 +43,10 @@
   RandomMapManager.constantPass = 0;
 
   RandomMapManager.constantWall = 1;
+
+  RandomMapManager.constantEntranceFlag = 2;
+
+  RandomMapManager.constantExitFlag = 3;
 
   RandomMapManager.Prim.generateRandomStructure = function(width, height) {
     var actualHeight, actualWidth, map, mirror, movement, road, starter, starterX, starterY, wall, wallIndex, walls, _i, _len, _ref;
@@ -187,7 +190,7 @@
           surroundingX = x + surrounding[0];
           surroundingY = y + surrounding[1];
           passes = map[surroundingY][surroundingX];
-          if (passes === RandomMapManager.constantPass) {
+          if (passes !== RandomMapManager.constantWall) {
             passCount += 1;
           }
           surroundings.push(passes);
@@ -239,6 +242,12 @@
               areaId = RandomMapManager.constantAreaToUpDead;
             }
         }
+        if (surroundings[0] === RandomMapManager.constantEntranceFlag) {
+          areaId = RandomMapManager.constantAreaEntrance;
+        }
+        if (surroundings[1] === RandomMapManager.constantExitFlag) {
+          areaId = RandomMapManager.constantAreaExit;
+        }
         area[j - 1][i - 1] = areaId;
       }
     }
@@ -249,18 +258,21 @@
     function MapSource(dataMap) {
       this.width = dataMap.width;
       this.height = dataMap.height;
-      this.blockWidth = 5;
-      this.blockHeight = 5;
+      if (!dataMap.meta) {
+        DataManager.extractMetadata(dataMap);
+      }
+      this.blockWidth = parseInt(dataMap.meta.blockWidth) || 5;
+      this.blockHeight = parseInt(dataMap.meta.blockHeight) || 5;
+      this.entrancePosition = parseInt(dataMap.meta.entrancePosition) || (this.blockHeight - 1) / 2;
       this.mapElements = {};
       this.data = dataMap.data;
       this.analyzeMap(this.data);
     }
 
     MapSource.prototype.analyzeMap = function(data) {
-      var area, border, index, offset, _results;
+      var area, border, index, offset;
       offset = this.width * this.height * 5;
       index = offset;
-      _results = [];
       while (index <= this.width * this.height * 6) {
         if (index % this.width === 0 && border) {
           index = border + 1;
@@ -278,9 +290,9 @@
           this.mapElements[area] = [];
         }
         this.mapElements[area].push(index - offset);
-        _results.push(index += this.blockWidth);
+        index += this.blockWidth;
       }
-      return _results;
+      return 0;
     };
 
     MapSource.prototype.getMapData = function(data, x, y, z) {
@@ -295,9 +307,10 @@
         z = zRange[_i];
         sourceBase = sourceStartIndex + z * this.width * this.height;
         receiverBase = z * receiverMapWidth * receiverMapHeight + offset;
+        console.log(sourceBase, receiverBase);
         for (j = _j = 0, _ref = this.blockHeight - 1; 0 <= _ref ? _j <= _ref : _j >= _ref; j = 0 <= _ref ? ++_j : --_j) {
           for (i = _k = 0, _ref1 = this.blockWidth - 1; 0 <= _ref1 ? _k <= _ref1 : _k >= _ref1; i = 0 <= _ref1 ? ++_k : --_k) {
-            receiver[receiverBase + j * receiverMapHeight + i] = this.data[sourceBase + j * this.width + i];
+            receiver[receiverBase + j * receiverMapWidth + i] = this.data[sourceBase + j * this.width + i];
           }
         }
       }
@@ -305,7 +318,7 @@
     };
 
     MapSource.prototype.generateMap = function(sourceData, mapData, mapWidth, mapHeight) {
-      var areaId, choices, height, i, j, startIndex, width, _i, _j, _ref, _ref1;
+      var areaId, choices, entrance, height, i, j, startIndex, width, _i, _j, _ref, _ref1;
       height = sourceData.length;
       width = sourceData[0].length;
       for (j = _i = 0, _ref = height - 1; 0 <= _ref ? _i <= _ref : _i >= _ref; j = 0 <= _ref ? ++_i : --_i) {
@@ -316,10 +329,13 @@
             continue;
           }
           startIndex = choices[Math.randomInt(0, choices.length - 1)];
+          if (areaId === RandomMapManager.constantAreaEntrance) {
+            entrance = j;
+          }
           this.copyMapData(startIndex, mapData, i * this.blockWidth, j * this.blockHeight, mapWidth, mapHeight);
         }
       }
-      return 0;
+      return entrance * this.blockHeight + this.entrancePosition;
     };
 
     return MapSource;
@@ -327,12 +343,13 @@
   })();
 
   RandomMapManager.MapSource.loadMap = function(id) {
-    var fileName;
+    var $sourceMap, fileName;
     if (typeof id !== 'string') {
       id = id.padZero(3);
     }
     fileName = "Map" + id + ".json";
-    return DataManager.loadDataFile('$lastAnalyzedFile', fileName);
+    $sourceMap = null;
+    return DataManager.loadDataFile('$sourceMap', fileName);
   };
 
   RandomMapManager.MapSource.loadMapByFs = function(id) {
@@ -345,20 +362,95 @@
     return fs.readFileSync(fileName).toString();
   };
 
+  RandomMapManager.makeEntranceAndExit = function(map) {
+    var entrance, exit;
+    entrance = Math.randomInt(0, (map.length - 3) / 2);
+    map[entrance * 2 + 1][0] = RandomMapManager.constantEntranceFlag;
+    map[entrance * 2 + 1][2] = RandomMapManager.constantPass;
+    exit = Math.randomInt(0, (map.length - 3) / 2);
+    map[exit * 2 + 1][map[0].length - 1] = RandomMapManager.constantExitFlag;
+    return map[exit * 2 + 1][map[0].length - 3] = RandomMapManager.constantPass;
+  };
+
   this.RandomMapManager = RandomMapManager;
 
-  file = RandomMapManager.MapSource.loadMapByFs("002");
+  RandomMapManager.generateAreaArrayByPrim = function(width, height) {
+    var area, struct;
+    struct = RandomMapManager.Prim.generateRandomStructure(width, height);
+    RandomMapManager.makeEntranceAndExit(struct);
+    area = RandomMapManager.convertStructureToAreaId(struct);
+    return area;
+  };
 
-  data = JSON.parse(file);
+  RandomMapManager.Test = function() {};
 
-  c = new RandomMapManager.MapSource(data);
+  RandomMapManager.Test.test1 = function() {
+    var c, data, file, generate;
+    file = RandomMapManager.MapSource.loadMapByFs("002");
+    data = JSON.parse(file);
+    c = new RandomMapManager.MapSource(data);
+    generate = RandomMapManager.convertStructureToAreaId(RandomMapManager.Prim.generateRandomStructure(10, 10));
+    data = new Array(2500);
+    return c.generateMap(generate, data, 50, 50);
+  };
 
-  generate = RandomMapManager.convertStructureToAreaId(RandomMapManager.Prim.generateRandomStructure(10, 10));
+  _RandomMap_Alias_Game_Interpreter_pluginCommand = Game_Interpreter.prototype.pluginCommand;
 
-  data = new Array(2500);
+  _RandomMap_Alias_Game_Interpreter_command201 = Game_Interpreter.prototype.command201;
 
-  c.generateMap(generate, data, 50, 50);
+  _RandomMap_Alias_Scene_Map_isReady = Scene_Map.prototype.isReady;
 
-  console.log(data);
+  _RandomMap_Alias_Scene_Map_onMapLoaded = Scene_Map.prototype.onMapLoaded;
+
+  Game_Interpreter.prototype.pluginCommand = function(command, args) {
+    var mapID, mapInt;
+    _RandomMap_Alias_Game_Interpreter_pluginCommand(command, args);
+    if (command === 'Maze') {
+      mapID = args[0];
+      mapInt = parseInt(mapID);
+      if (mapInt) {
+        mapID = mapInt;
+      }
+      return RandomMapManager.MapSource.loadMap(mapID);
+    }
+  };
+
+  Scene_Map.prototype.isReady = function() {
+    if (!this._mapLoaded && DataManager.isMapLoaded()) {
+      if ($dataMap.meta.randomMaze) {
+        if (!DataManager.isSourceMapLoaded) {
+          console.log('No source maze map when ready check. Did you set the maze?');
+          return false;
+        }
+      }
+      this.onMapLoaded();
+      this._mapLoaded = true;
+    }
+    return this._mapLoaded && Scene_Base.prototype.isReady.call(this);
+  };
+
+  Scene_Map.prototype.onMapLoaded = function() {
+    var area, size;
+    if ($dataMap.meta.randomMaze) {
+      size = eval($dataMap.meta.randomMaze);
+      area = RandomMapManager.generateAreaArrayByPrim(size[0], size[1]);
+      if (!$sourceMap.source) {
+        $sourceMap.source = new RandomMapManager.MapSource($sourceMap);
+      }
+      $gamePlayer._newY = $sourceMap.source.generateMap(area, $dataMap.data, $dataMap.width, $dataMap.height);
+    }
+    if (this._transfer) {
+      $gamePlayer.performTransfer();
+    }
+    return this.createDisplayObjects();
+  };
+
+  DataManager.isSourceMapLoaded = function() {
+    this.checkError();
+    if (!!$sourceMap) {
+      $sourceMap.source = new RandomMapManager.MapSource($sourceMap);
+    }
+    return !!$sourceMap;
+  };
 
 }).call(this);

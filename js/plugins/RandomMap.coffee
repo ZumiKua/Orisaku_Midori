@@ -9,6 +9,7 @@ Math.randomInt = (min, max)->
 Array.prototype.fill = (num)->
     for i in [0..@length - 1]
         this[i] = num
+    this
 
 class Point 
     constructor: (x, y) ->
@@ -24,6 +25,8 @@ RandomMapManager.Prim = ->
 RandomMapManager.constantSurroudings = [[-1, 0], [1, 0], [0, -1], [0, 1]]
 RandomMapManager.constantPass = 0
 RandomMapManager.constantWall = 1
+RandomMapManager.constantEntranceFlag = 2
+RandomMapManager.constantExitFlag = 3
 
 RandomMapManager.Prim.generateRandomStructure = (width, height)->
     actualWidth = width * 2 + 1
@@ -111,7 +114,7 @@ RandomMapManager.convertStructureToAreaId = (map) ->
                 surroundingX = x + surrounding[0]
                 surroundingY = y + surrounding[1]
                 passes = map[surroundingY][surroundingX]
-                passCount += 1 if passes == RandomMapManager.constantPass
+                passCount += 1 if passes != RandomMapManager.constantWall
                 surroundings.push passes
             areaId = RandomMapManager.constantAreaWall
             switch passCount
@@ -148,6 +151,10 @@ RandomMapManager.convertStructureToAreaId = (map) ->
                         areaId = RandomMapManager.constantAreaToDownDead
                     else if surroundings[3] == RandomMapManager.constantPass
                         areaId = RandomMapManager.constantAreaToUpDead
+            if surroundings[0] == RandomMapManager.constantEntranceFlag
+                areaId = RandomMapManager.constantAreaEntrance
+            if surroundings[1] == RandomMapManager.constantExitFlag
+                areaId = RandomMapManager.constantAreaExit
             area[j - 1][i - 1] = areaId
     area
 
@@ -155,8 +162,10 @@ class RandomMapManager.MapSource
     constructor: (dataMap) ->
         @width = dataMap.width
         @height = dataMap.height
-        @blockWidth = 5#dataMap.meta.blockWidth || 3
-        @blockHeight = 5#dataMap.meta.blockHeight || 3
+        DataManager.extractMetadata dataMap if !dataMap.meta
+        @blockWidth = parseInt(dataMap.meta.blockWidth) || 5
+        @blockHeight = parseInt(dataMap.meta.blockHeight) || 5
+        @entrancePosition = parseInt(dataMap.meta.entrancePosition) || (@blockHeight - 1) / 2
         @mapElements = {}
         @data = dataMap.data
         @analyzeMap @data
@@ -177,6 +186,7 @@ class RandomMapManager.MapSource
             @mapElements[area] = [] if !@mapElements[area]
             @mapElements[area].push index - offset
             index += @blockWidth
+        0
 
     getMapData: (data, x, y, z) ->
         return data[@width * @height * z + y * @width + x]
@@ -185,11 +195,12 @@ class RandomMapManager.MapSource
         zRange = zRange || [0..4]
         offset = receiverStartY * receiverMapWidth + receiverStartX
         for z in zRange
-            sourceBase = sourceStartIndex + 5 * @width * @height
+            sourceBase = sourceStartIndex + z * @width * @height
             receiverBase = z * receiverMapWidth * receiverMapHeight + offset
+            console.log sourceBase, receiverBase
             for j in [0..@blockHeight - 1]
                 for i in [0..@blockWidth - 1]
-                    receiver[receiverBase + j * receiverMapHeight + i] = @data[sourceBase + j * @width + i]
+                    receiver[receiverBase + j * receiverMapWidth + i] = @data[sourceBase + j * @width + i]
         0
 
     generateMap: (sourceData, mapData, mapWidth, mapHeight)->
@@ -201,15 +212,15 @@ class RandomMapManager.MapSource
                 choices = @mapElements[areaId]
                 continue if !choices
                 startIndex = choices[Math.randomInt(0, choices.length - 1)]
+                entrance = j if areaId == RandomMapManager.constantAreaEntrance
                 @copyMapData startIndex, mapData, i * @blockWidth, j * @blockHeight, mapWidth, mapHeight
-        0
+        entrance * @blockHeight + @entrancePosition
 
 RandomMapManager.MapSource.loadMap = (id)->
     id = id.padZero(3) if typeof id != 'string'
     fileName = "Map#{id}.json"
-    DataManager.loadDataFile '$lastAnalyzedFile', fileName
-    #RandomMapManager.MapSource.wait while $lastAnalyzedFile == null
-    #$lastAnalyzedFile
+    $sourceMap = null
+    DataManager.loadDataFile '$sourceMap', fileName
 
 RandomMapManager.MapSource.loadMapByFs = (id)->
     id = id.padZero(3) if typeof id != 'string'
@@ -217,12 +228,72 @@ RandomMapManager.MapSource.loadMapByFs = (id)->
     fs = require 'fs'
     fs.readFileSync(fileName).toString()
 
+RandomMapManager.makeEntranceAndExit = (map)->
+    # Entrance Only on left
+    entrance = Math.randomInt 0, (map.length - 3) / 2
+    map[entrance * 2 + 1][0] = RandomMapManager.constantEntranceFlag
+    map[entrance * 2 + 1][2] = RandomMapManager.constantPass
+    # Exit Only on right
+    exit = Math.randomInt 0, (map.length - 3) / 2
+    map[exit * 2 + 1][map[0].length - 1] = RandomMapManager.constantExitFlag
+    map[exit * 2 + 1][map[0].length - 3] = RandomMapManager.constantPass
+
 @RandomMapManager = RandomMapManager
 
-file = RandomMapManager.MapSource.loadMapByFs "002"
-data = JSON.parse file
-c = new RandomMapManager.MapSource data
-generate = RandomMapManager.convertStructureToAreaId RandomMapManager.Prim.generateRandomStructure(10, 10)
-data = new Array 2500
-c.generateMap generate, data, 50, 50
-console.log data
+RandomMapManager.generateAreaArrayByPrim = (width, height) ->
+    struct = RandomMapManager.Prim.generateRandomStructure width, height
+    RandomMapManager.makeEntranceAndExit struct
+    area = RandomMapManager.convertStructureToAreaId struct
+    area
+
+RandomMapManager.Test = ->
+
+RandomMapManager.Test.test1 = ->
+    file = RandomMapManager.MapSource.loadMapByFs "002"
+    data = JSON.parse file
+    c = new RandomMapManager.MapSource data
+    generate = RandomMapManager.convertStructureToAreaId RandomMapManager.Prim.generateRandomStructure(10, 10)
+    data = new Array 2500
+    c.generateMap generate, data, 50, 50
+
+
+_RandomMap_Alias_Game_Interpreter_pluginCommand = Game_Interpreter.prototype.pluginCommand
+_RandomMap_Alias_Game_Interpreter_command201 = Game_Interpreter.prototype.command201
+_RandomMap_Alias_Scene_Map_isReady = Scene_Map.prototype.isReady
+_RandomMap_Alias_Scene_Map_onMapLoaded = Scene_Map.prototype.onMapLoaded
+
+Game_Interpreter.prototype.pluginCommand = (command, args) ->
+    _RandomMap_Alias_Game_Interpreter_pluginCommand command, args
+    if command == 'Maze'
+        mapID = args[0]
+        mapInt = parseInt mapID
+        mapID = mapInt if mapInt
+        RandomMapManager.MapSource.loadMap mapID
+
+Scene_Map.prototype.isReady = ->
+    if (!this._mapLoaded && DataManager.isMapLoaded())
+        if $dataMap.meta.randomMaze
+            if !DataManager.isSourceMapLoaded
+                console.log 'No source maze map when ready check. Did you set the maze?'
+                return false
+        @onMapLoaded();
+        this._mapLoaded = true;
+    this._mapLoaded && Scene_Base.prototype.isReady.call(this);
+
+Scene_Map.prototype.onMapLoaded = ->
+    if $dataMap.meta.randomMaze
+        size = eval $dataMap.meta.randomMaze
+        area = RandomMapManager.generateAreaArrayByPrim size[0], size[1]
+        $sourceMap.source = new RandomMapManager.MapSource $sourceMap if !$sourceMap.source
+        $gamePlayer._newY = $sourceMap.source.generateMap area, $dataMap.data, $dataMap.width, $dataMap.height 
+    if (this._transfer)
+        $gamePlayer.performTransfer();
+    @createDisplayObjects();
+
+DataManager.isSourceMapLoaded = ->
+    @checkError()
+    if !!$sourceMap
+        $sourceMap.source = new RandomMapManager.MapSource $sourceMap
+    !!$sourceMap 
+    
+
