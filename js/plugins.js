@@ -6,5 +6,6 @@ var $plugins =
 {"name":"SkipPartyCommand","status":true,"description":"skip the command choose fight or escape on battle.","parameters":{}},
 {"name":"BattleUIAdjustment","status":true,"description":"Adjust the Battle UI positions.","parameters":{}},
 {"name":"MessageEx","status":true,"description":"","parameters":{}},
-{"name":"CraftSystem","status":true,"description":"","parameters":{}}
+{"name":"CraftSystem","status":true,"description":"","parameters":{}},
+{"name":"RandomMap","status":true,"description":"Generate Map randomly.","parameters":{}}
 ];
