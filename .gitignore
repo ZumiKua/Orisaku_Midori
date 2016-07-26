@@ -8,3 +8,5 @@
 !img/pictures/*
 # VSCode configs.
 js/.vscode/*
+# Fuck Mac
+._*
