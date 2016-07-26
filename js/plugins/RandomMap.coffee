@@ -170,6 +170,7 @@ class RandomMapManager.MapSource
         @width = dataMap.width
         @height = dataMap.height
         #dataMap.meta = {}
+        DataManager.extractMetadata dataMap if !dataMap.meta
         @blockWidth = parseInt(dataMap.meta.blockWidth) || 5
         @blockHeight = parseInt(dataMap.meta.blockHeight) || 5
         @entrancePosition = parseInt(dataMap.meta.entrancePosition) || (@blockHeight - 1) / 2

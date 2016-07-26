@@ -273,6 +273,9 @@
     function MapSource(dataMap) {
       this.width = dataMap.width;
       this.height = dataMap.height;
+      if (!dataMap.meta) {
+        DataManager.extractMetadata(dataMap);
+      }
       this.blockWidth = parseInt(dataMap.meta.blockWidth) || 5;
       this.blockHeight = parseInt(dataMap.meta.blockHeight) || 5;
       this.entrancePosition = parseInt(dataMap.meta.entrancePosition) || (this.blockHeight - 1) / 2;
