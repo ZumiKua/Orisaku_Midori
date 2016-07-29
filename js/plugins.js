@@ -8,5 +8,6 @@ var $plugins =
 {"name":"MessageEx","status":true,"description":"","parameters":{}},
 {"name":"CraftSystem","status":true,"description":"","parameters":{}},
 {"name":"RandomMap","status":true,"description":"Generate Map randomly.","parameters":{}},
-{"name":"InventoryLimitation","status":true,"description":"","parameters":{}}
+{"name":"InventoryLimitation","status":true,"description":"","parameters":{}},
+{"name":"GainItemHint","status":true,"description":"Add a hint when you get item.","parameters":{"gainItemHint":"获得了","loseItemHint":"失去了","hintWindowDurations":"120"}}
 ];
