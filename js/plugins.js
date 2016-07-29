@@ -7,5 +7,6 @@ var $plugins =
 {"name":"BattleUIAdjustment","status":true,"description":"Adjust the Battle UI positions.","parameters":{}},
 {"name":"MessageEx","status":true,"description":"","parameters":{}},
 {"name":"CraftSystem","status":true,"description":"","parameters":{}},
-{"name":"RandomMap","status":true,"description":"Generate Map randomly.","parameters":{}}
+{"name":"RandomMap","status":true,"description":"Generate Map randomly.","parameters":{}},
+{"name":"InventoryLimitation","status":true,"description":"","parameters":{}}
 ];
