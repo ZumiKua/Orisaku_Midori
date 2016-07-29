@@ -3,12 +3,24 @@
 /*:
     @plugindesc Add a hint when you get item.
     @author IamI
+
+    @param gainItemHint
+    @default 获得了
+
+    @param loseItemHint
+    @default 失去了
+
+    @param hintWindowDurations
+    @desc How much durations the Hint Window will appear, not including close time
+    @default 120
  */
 
 (function() {
-  var Window_GainItem, _GainItemHint_Alias_Game_Interpreter_Command125, _GainItemHint_Alias_Game_Interpreter_Command126, _GainItemHint_Alias_Game_Interpreter_Command127, _GainItemHint_Alias_Game_Interpreter_Command128,
+  var GainItemHintHelper, Window_GainItem, gainItemParameters, _GainItemHint_Alias_Game_Interpreter_Command125, _GainItemHint_Alias_Game_Interpreter_Command126, _GainItemHint_Alias_Game_Interpreter_Command127, _GainItemHint_Alias_Game_Interpreter_Command128,
     __hasProp = {}.hasOwnProperty,
     __extends = function(child, parent) { for (var key in parent) { if (__hasProp.call(parent, key)) child[key] = parent[key]; } function ctor() { this.constructor = child; } ctor.prototype = parent.prototype; child.prototype = new ctor(); child.__super__ = parent.prototype; return child; };
+
+  gainItemParameters = PluginManager.parameters("GainItemHint");
 
   Window_GainItem = (function(_super) {
     __extends(Window_GainItem, _super);
@@ -16,54 +28,79 @@
     function Window_GainItem() {
       this.initialize.call(this);
       this.datas = [];
-      this.counts = {};
     }
+
+    Window_GainItem.prototype.addGold = function(count) {
+      var item;
+      item = TextManager.currencyUnit;
+      return this.datas.push([item, count]);
+    };
 
     Window_GainItem.prototype.addItem = function(itemId, count) {
       var item;
       item = $dataItems[itemId];
-      this.datas.push(item);
-      return this.addToCount(item, count);
+      return this.datas.push([item, count]);
     };
 
-    Window_GainItem.prototype.addWeapon = function(weaponId) {
+    Window_GainItem.prototype.addWeapon = function(weaponId, count) {
       var weapon;
       weapon = $dataWeapons[weaponId];
-      this.datas.push(weapon);
-      return this.addToCount(weapon, count);
+      return this.datas.push([weapon, count]);
     };
 
-    Window_GainItem.prototype.addArmor = function(armorId) {
+    Window_GainItem.prototype.addArmor = function(armorId, count) {
       var armor;
       armor = $dataArmors[armorId];
-      this.datas.push(armor);
-      return this.addToCount(armor, count);
+      return this.datas.push([armor, count]);
     };
 
-    Window_GainItem.prototype.addToCount = function(item, count) {
-      if (!this.counts[item]) {
-        this.counts[item] = 0;
-      }
-      return this.counts[item] += count;
+    Window_GainItem.prototype.clear = function() {
+      return this.datas = [];
     };
 
     Window_GainItem.prototype.refresh = function() {
-      var data, height, order, width, x, y, _i, _len, _ref, _results;
+      var array, count, data, hintText, order, x, y, _i, _len, _ref, _results;
+      this.resize();
+      order = 0;
+      _ref = this.datas;
+      _results = [];
+      for (_i = 0, _len = _ref.length; _i < _len; _i++) {
+        array = _ref[_i];
+        data = array[0];
+        count = array[1];
+        hintText = count > 0 ? gainItemParameters.gainItemHint : gainItemParameters.loseItemHint;
+        y = order * this.lineHeight();
+        x = this.textPadding() * 2 + this.contents.measureTextWidth(hintText);
+        this.changeTextColor(this.systemColor());
+        this.contents.drawText(hintText, this.textPadding(), y, this.contents.width, this.lineHeight());
+        this.resetTextColor();
+        if (data !== TextManager.currencyUnit) {
+          this.drawItemName(data, x, y, this.contents.width);
+          this.contents.drawText("X " + Math.abs(count), 0, y, this.contents.width, this.lineHeight(), 'right');
+        } else {
+          this.drawCurrencyValue(count, data, 0, y, this.contents.width);
+        }
+        _results.push(order += 1);
+      }
+      return _results;
+    };
+
+    Window_GainItem.prototype.resize = function() {
+      var height, width, x, y;
       width = 400;
       height = this.datas.length * this.lineHeight() + this.standardPadding() * 2;
       x = (Graphics.boxWidth - width) / 2;
       y = (Graphics.boxHeight - height) / 2;
       this.move(x, y, width, height);
       this.createContents();
-      order = 0;
-      _ref = this.datas;
-      _results = [];
-      for (_i = 0, _len = _ref.length; _i < _len; _i++) {
-        data = _ref[_i];
-        this.drawItemName(data, this.textPadding(), order * this.lineHeight(), width - this.contents.width);
-        _results.push(order += 1);
+      return this.contents.fontSize = 24;
+    };
+
+    Window_GainItem.prototype.update = function() {
+      Window_Base.prototype.update.call(this);
+      if (Input.isTriggered('ok') || Input.isTriggered('cancel')) {
+        return this.close();
       }
-      return _results;
     };
 
     return Window_GainItem;
@@ -78,14 +115,27 @@
 
   _GainItemHint_Alias_Game_Interpreter_Command128 = Game_Interpreter.prototype.command128;
 
+  Game_Interpreter.prototype.command125 = function() {
+    var result, value;
+    console.log("I run!");
+    result = _GainItemHint_Alias_Game_Interpreter_Command125.call(this);
+    GainItemHintHelper.checkGainHintWindow();
+    value = this.operateValue(this._params[0], this._params[1], this._params[2]);
+    GainItemHintHelper.gainItemHintWindow.addGold(value);
+    if (!this.nextCommandIsItem()) {
+      GainItemHintHelper.showGainHintWindow();
+    }
+    return result;
+  };
+
   Game_Interpreter.prototype.command126 = function() {
     var result, value;
     result = _GainItemHint_Alias_Game_Interpreter_Command126.call(this);
-    this.checkGainHintWindow();
+    GainItemHintHelper.checkGainHintWindow();
     value = this.operateValue(this._params[1], this._params[2], this._params[3]);
-    this.gainItemHintWindow.addItem(this._params[0], value);
+    GainItemHintHelper.gainItemHintWindow.addItem(this._params[0], value);
     if (!this.nextCommandIsItem()) {
-      this.showGainHintWindow();
+      GainItemHintHelper.showGainHintWindow();
     }
     return result;
   };
@@ -93,11 +143,11 @@
   Game_Interpreter.prototype.command127 = function() {
     var result, value;
     result = _GainItemHint_Alias_Game_Interpreter_Command127.call(this);
-    this.checkGainHintWindow();
+    GainItemHintHelper.checkGainHintWindow();
     value = this.operateValue(this._params[1], this._params[2], this._params[3]);
-    this.gainItemHintWindow.addWeapon(this._params[0], value);
+    GainItemHintHelper.gainItemHintWindow.addWeapon(this._params[0], value);
     if (!this.nextCommandIsItem()) {
-      this.showGainHintWindow();
+      GainItemHintHelper.showGainHintWindow();
     }
     return result;
   };
@@ -105,11 +155,11 @@
   Game_Interpreter.prototype.command128 = function() {
     var result, value;
     result = _GainItemHint_Alias_Game_Interpreter_Command128.call(this);
-    this.checkGainHintWindow();
+    GainItemHintHelper.checkGainHintWindow();
     value = this.operateValue(this._params[1], this._params[2], this._params[3]);
-    this.gainItemHintWindow.addArmor(this._params[0], value);
+    GainItemHintHelper.gainItemHintWindow.addArmor(this._params[0], value);
     if (!this.nextCommandIsItem()) {
-      this.showGainHintWindow();
+      GainItemHintHelper.showGainHintWindow();
     }
     return result;
   };
@@ -117,29 +167,62 @@
   Game_Interpreter.prototype.nextCommandIsItem = function() {
     var code;
     code = this.nextEventCode();
-    if (code === 126 || code === 127 || code === 128) {
+    if (code === 125 || code === 126 || code === 127 || code === 128) {
       return true;
     }
     return false;
   };
 
-  Game_Interpreter.prototype.checkGainHintWindow = function() {
-    if (!this.gainItemHintWindow) {
-      return this.gainItemHintWindow = new Window_GainItem;
+  GainItemHintHelper = function() {
+    throw new Error('This is a static class!');
+  };
+
+  GainItemHintHelper.checkGainHintWindow = function() {
+    if (!GainItemHintHelper.gainItemHintWindow) {
+      return GainItemHintHelper.gainItemHintWindow = new Window_GainItem;
     }
   };
 
-  Game_Interpreter.prototype.showGainHintWindow = function() {
-    this.checkGainHintWindow();
-    this.gainItemHintWindow.refresh();
-    this.gainItemHintWindow.openness = 0;
-    SceneManager._scene.addChild(this.gainItemHintWindow);
-    return this.gainItemHintWindow.open();
+  GainItemHintHelper.showGainHintWindow = function() {
+    GainItemHintHelper.checkGainHintWindow();
+    GainItemHintHelper.gainItemHintWindow.refresh();
+    GainItemHintHelper.gainItemHintWindow.clear();
+    GainItemHintHelper.gainItemHintWindow.openness = 0;
+    GainItemHintHelper.stickInScene();
+    SceneManager._scene.stickedWaitingCount = parseInt(gainItemParameters.hintWindowDurations) || 120;
+    SceneManager._scene.stickedWindow = GainItemHintHelper.gainItemHintWindow;
+    SceneManager._scene.addChild(GainItemHintHelper.gainItemHintWindow);
+    GainItemHintHelper.gainItemHintWindow.open();
+    return SoundManager.playShop();
   };
 
-  Game_Interpreter.prototype.terminateGainHintWindow = function() {
-    this.gainItemHintWindow = null;
-    return SceneManager._scene.removeChild(this.gainItemHintWindow);
+  GainItemHintHelper.stickInScene = function() {
+    var scene;
+    scene = SceneManager._scene;
+    if (scene._normalUpdate) {
+      return;
+    }
+    scene._normalUpdate = scene.update;
+    return scene.update = function() {
+      if (this.stickedWindow) {
+        if (!this.stickedWaitingCount) {
+          this.stickedWaitingCount = 1;
+        }
+        this.stickedWaitingCount -= 1;
+        if (this.stickedWaitingCount <= 0) {
+          this.stickedWindow.close();
+        }
+        if (this.stickedWindow.isClosed()) {
+          this.removeChild(this.stickedWindow);
+          return this.stickedWindow = null;
+        } else {
+          Scene_Base.prototype.update.call(this);
+          return this.stickedWindow.update();
+        }
+      } else {
+        return this._normalUpdate();
+      }
+    };
   };
 
 }).call(this);
