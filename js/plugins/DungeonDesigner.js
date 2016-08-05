@@ -10,13 +10,15 @@
  */
 
 (function() {
-  var DungeonDesignerParameters, Game_Dungeon, Scene_Dungeon, Window_DungeonHint, Window_DungeonMenu, Window_ItemUseList, Window_PutEnemyEvent, _DungeonDesigner_Alias_Game_Interpreter_command301, _DungeonDesigner_Alias_Scene_Map_create, _DungeonDesigner_Alias_Scene_Map_update,
+  var DungeonDesignerParameters, Game_Dungeon, Scene_Dungeon, Window_DungeonHint, Window_DungeonMenu, Window_ItemUseList, Window_PutEnemyEvent, _DungeonDesigner_Alias_Game_Interpreter_command301, _DungeonDesigner_Alias_Scene_Map_createAllWindows, _DungeonDesigner_Alias_Scene_Map_onMapLoaded, _DungeonDesigner_Alias_Scene_Map_update,
     __hasProp = {}.hasOwnProperty,
     __extends = function(child, parent) { for (var key in parent) { if (__hasProp.call(parent, key)) child[key] = parent[key]; } function ctor() { this.constructor = child; } ctor.prototype = parent.prototype; child.prototype = new ctor(); child.__super__ = parent.prototype; return child; };
 
-  _DungeonDesigner_Alias_Scene_Map_create = Scene_Map.prototype.create;
+  _DungeonDesigner_Alias_Scene_Map_createAllWindows = Scene_Map.prototype.createAllWindows;
 
   _DungeonDesigner_Alias_Scene_Map_update = Scene_Map.prototype.update;
+
+  _DungeonDesigner_Alias_Scene_Map_onMapLoaded = Scene_Map.prototype.onMapLoaded;
 
   _DungeonDesigner_Alias_Game_Interpreter_command301 = Game_Interpreter.prototype.command301;
 
@@ -32,12 +34,21 @@
     Game_Dungeon.prototype.start = function() {
       var target;
       target = $gameParty.members()[0];
+      this._mapId = $gameMap._mapId;
       this._hp = target.mhp;
       this._maxhp = target.mhp;
       this._mp = target.mmp;
       this._maxmp = target.mmp;
       this._isDesigningDungeon = true;
+      this._usedItems = {};
+      this._usedSkills = {};
+      this._states = [];
+      this._extraEvents = [];
       return this.loadMap();
+    };
+
+    Game_Dungeon.prototype.terminate = function() {
+      return this._isDesigningDungeon = false;
     };
 
     Game_Dungeon.prototype.loadMap = function() {
@@ -65,9 +76,44 @@
       return _results;
     };
 
-    Game_Dungeon.prototype.putEvent = function(event) {};
+    Game_Dungeon.prototype.putEvent = function(eventIndex) {
+      var dir, event, targetvent, x, y;
+      event = $enemyZoo.events[eventIndex];
+      dir = [null, [-1, 1], [0, 1], [1, 1], [-1, 0], [0, 0], [0, 1], [1, -1], [1, 0], [1, 1]][$gamePlayer.direction()];
+      x = $gamePlayer.x + dir[0];
+      y = $gamePlayer.y + dir[1];
+      console.log(x, y);
+      targetvent = {
+        id: $dataMap.events.length + this._extraEvents.length,
+        meta: event.meta,
+        name: event.name,
+        note: event.note,
+        pages: event.pages,
+        x: x,
+        y: y
+      };
+      return this._extraEvents.push(targetvent);
+    };
 
     Game_Dungeon.prototype.battle = function(troop) {};
+
+    Game_Dungeon.prototype.useItem = function(itemIndex) {
+      var item;
+      item = $dataItems[itemIndex];
+      if (!this._usedItems[itemIndex]) {
+        this._usedItems[itemIndex] = 0;
+      }
+      return this._usedItems[itemIndex] += 1;
+    };
+
+    Game_Dungeon.prototype.useSkill = function(skillIndex) {
+      var skill;
+      skill = $dataSkills[skillIndex];
+      if (!this._usedSkills[skillIndex]) {
+        this._usedSkills[skillIndex] = 0;
+      }
+      return this._usedSkills[skillIndex] += 1;
+    };
 
     return Game_Dungeon;
 
@@ -91,7 +137,7 @@
 
   Scene_Map.prototype.createDungeonHintWindow = function() {
     this._dungeonHintWindow = new Window_DungeonHint();
-    return this.addChild(this._dungeonHintWindow);
+    return this.addWindow(this._dungeonHintWindow);
   };
 
   Scene_Map.prototype.callDungeonMenu = function() {
@@ -106,8 +152,17 @@
     }
   };
 
-  Scene_Map.prototype.create = function() {
-    _DungeonDesigner_Alias_Scene_Map_create.call(this);
+  Scene_Map.prototype.onMapLoaded = function() {
+    if ($gameMap._mapId === $gameDungeon._mapId) {
+      $dataMap.events = $dataMap.events.concat($gameDungeon._extraEvents);
+      $gameMap.setup($dataMap._mapId);
+      console.log($dataMap.events, $gameDungeon._extraEvents);
+    }
+    return _DungeonDesigner_Alias_Scene_Map_onMapLoaded.call(this);
+  };
+
+  Scene_Map.prototype.createAllWindows = function() {
+    _DungeonDesigner_Alias_Scene_Map_createAllWindows.call(this);
     if ($gameDungeon._isDesigningDungeon) {
       return this.createDungeonHintWindow();
     }
@@ -155,9 +210,11 @@
     __extends(Window_DungeonHint, _super);
 
     function Window_DungeonHint() {
-      var height, width, x, y;
+      var height, itemLength, skillLength, width, x, y;
       width = 350;
-      height = this.lineHeight() * 2 + this.standardPadding() * 2;
+      itemLength = Object.keys($gameDungeon._usedItems).length;
+      skillLength = Object.keys($gameDungeon._usedSkills).length;
+      height = this.lineHeight() * (2 + itemLength + skillLength) + this.standardPadding() * 2;
       x = Graphics.boxWidth - width;
       y = 0;
       this.initialize.call(this, x, y, width, height);
@@ -165,8 +222,30 @@
     }
 
     Window_DungeonHint.prototype.refresh = function() {
+      var index, item, itemIndex, skill, skillIndex, y, _i, _j, _len, _len1, _ref, _ref1, _results;
       this.contents.drawText(" 当前 HP " + $gameDungeon._hp + " / " + $gameDungeon._maxhp, 0, 0, this.contents.width, this.lineHeight());
-      return this.contents.drawText(" 当前 MP " + $gameDungeon._mp + " / " + $gameDungeon._maxmp, 0, this.lineHeight(), this.contents.width, this.lineHeight());
+      this.contents.drawText(" 当前 MP " + $gameDungeon._mp + " / " + $gameDungeon._maxmp, 0, this.lineHeight(), this.contents.width, this.lineHeight());
+      index = 2;
+      _ref = Object.keys($gameDungeon._usedItems);
+      for (_i = 0, _len = _ref.length; _i < _len; _i++) {
+        itemIndex = _ref[_i];
+        item = $dataItems[itemIndex];
+        y = index * this.lineHeight();
+        this.drawItemName(item, 0, y, this.contents.width);
+        this.contents.drawText($gameDungeon._usedItems[itemIndex].toString(), 0, y, this.contents.width, this.lineHeight(), 'right');
+        index += 1;
+      }
+      _ref1 = Object.keys($gameDungeon._usedSkills);
+      _results = [];
+      for (_j = 0, _len1 = _ref1.length; _j < _len1; _j++) {
+        skillIndex = _ref1[_j];
+        skill = $dataSkills[skillIndex];
+        y = index * this.lineHeight();
+        this.drawItemName(skill, 0, y, this.contents.width);
+        this.contents.drawText($gameDungeon._usedSkills[skillIndex].toString(), 0, y, this.contents.width, this.lineHeight(), 'right');
+        _results.push(index += 1);
+      }
+      return _results;
     };
 
     return Window_DungeonHint;
@@ -179,6 +258,7 @@
     function Scene_Dungeon() {
       this.initialize.call(this);
       $gameDungeon.preloadCharacters();
+      this.state = 'command';
     }
 
     Scene_Dungeon.prototype.create = function() {
@@ -187,15 +267,118 @@
     };
 
     Scene_Dungeon.prototype.createWindows = function() {
+      this.createCommandWindow();
+      this.createItemWindow();
+      return this.createEventWindow();
+    };
+
+    Scene_Dungeon.prototype.createCommandWindow = function() {
       this._commandWindow = new Window_DungeonMenu();
       this._windowLayer.addChild(this._commandWindow);
+      this._commandWindow.setHandler('event', this.commandEvent.bind(this));
+      this._commandWindow.setHandler('item', this.commandItem.bind(this));
+      this._commandWindow.setHandler('skill', this.commandSkill.bind(this));
+      this._commandWindow.setHandler('exit', this.commandExit.bind(this));
+      return this._commandWindow.setHandler('cancel', this.cancelCommand.bind(this));
+    };
+
+    Scene_Dungeon.prototype.createEventWindow = function() {
       this._eventWindow = new Window_PutEnemyEvent();
       this._eventWindow.openness = 0;
-      this._windowLayer.addChild(this._eventWindow);
+      this._eventWindow.setHandler('ok', this.useEvent.bind(this));
+      this._eventWindow.setHandler('cancel', this.cancelEvent.bind(this));
+      return this._windowLayer.addChild(this._eventWindow);
+    };
+
+    Scene_Dungeon.prototype.createItemWindow = function() {
       this._itemWindow = new Window_ItemUseList($dataSkills);
-      this._itemWindow.list = $dataItems;
-      this._windowLayer.addChild(this._itemWindow);
-      return this._itemWindow.active = true;
+      this._itemWindow.openness = 0;
+      this._itemWindow.setHandler('ok', this.useObject.bind(this));
+      this._itemWindow.setHandler('cancel', this.cancelItem.bind(this));
+      return this._windowLayer.addChild(this._itemWindow);
+    };
+
+    Scene_Dungeon.prototype.commandEvent = function() {
+      return this.switchState('event');
+    };
+
+    Scene_Dungeon.prototype.commandItem = function() {
+      return this.switchState('item');
+    };
+
+    Scene_Dungeon.prototype.commandSkill = function() {
+      return this.switchState('skill');
+    };
+
+    Scene_Dungeon.prototype.commandExit = function() {
+      $gameDungeon.terminate();
+      return SceneManager.pop();
+    };
+
+    Scene_Dungeon.prototype.cancelEvent = function() {
+      return this.switchState('command');
+    };
+
+    Scene_Dungeon.prototype.cancelItem = function() {
+      return this.switchState('command');
+    };
+
+    Scene_Dungeon.prototype.cancelCommand = function() {
+      return SceneManager.pop();
+    };
+
+    Scene_Dungeon.prototype.useEvent = function() {
+      $gameDungeon.putEvent(this._eventWindow.index() + 1);
+      return SceneManager.pop();
+    };
+
+    Scene_Dungeon.prototype.useObject = function() {
+      if (this.state === 'item') {
+        return this.useItem();
+      } else if (this.state === 'skill') {
+        return this.useSkill();
+      }
+    };
+
+    Scene_Dungeon.prototype.useItem = function() {
+      $gameDungeon.useItem(this._itemWindow.index() + 1);
+      return SceneManager.pop();
+    };
+
+    Scene_Dungeon.prototype.useSkill = function() {
+      $gameDungeon.useSkill(this._itemWindow.index() + 1);
+      return SceneManager.pop();
+    };
+
+    Scene_Dungeon.prototype.switchState = function(state) {
+      switch (state) {
+        case 'event':
+          this._eventWindow.activate();
+          this._eventWindow.open();
+          this._eventWindow.select(0);
+          this._commandWindow.close();
+          break;
+        case 'item':
+          this._itemWindow.list = $dataItems;
+          this._itemWindow.open();
+          this._itemWindow.select(0);
+          this._itemWindow.activate();
+          this._commandWindow.close();
+          break;
+        case 'skill':
+          this._itemWindow.list = $dataSkills;
+          this._itemWindow.open();
+          this._itemWindow.select(0);
+          this._itemWindow.activate();
+          this._commandWindow.close();
+          break;
+        case 'command':
+          this._itemWindow.close();
+          this._eventWindow.close();
+          this._commandWindow.open();
+          this._commandWindow.activate();
+      }
+      return this.state = state;
     };
 
     Scene_Dungeon.prototype.update = function() {
@@ -205,7 +388,11 @@
 
     Scene_Dungeon.prototype.updateKeys = function() {
       if (Input.isTriggered('cancel')) {
-        return SceneManager.pop();
+        if (this.state === 'command') {
+          return SceneManager.pop();
+        } else {
+          return this.switchState('command');
+        }
       }
     };
 
@@ -223,7 +410,7 @@
     }
 
     Window_DungeonMenu.prototype.makeCommandList = function() {
-      this.addCommand("在面前放置事件", 'enemy');
+      this.addCommand("在面前放置事件", 'event');
       this.addCommand("使用物品", 'item');
       this.addCommand("使用技能", 'skill');
       this.addCommand("生成敌机地图", "createMap", false);
@@ -238,10 +425,12 @@
     __extends(Window_PutEnemyEvent, _super);
 
     function Window_PutEnemyEvent() {
-      var height, width;
+      var height, width, x, y;
       width = this.windowWidth();
       height = this.windowHeight();
-      this.initialize.call(this, 0, 0, width, height);
+      x = (Graphics.boxWidth - width) / 2;
+      y = (Graphics.boxHeight - height) / 2;
+      this.initialize.call(this, x, y, width, height);
       this.refresh();
       this._order = 0;
       this._count = 0;
@@ -325,8 +514,13 @@
     __extends(Window_ItemUseList, _super);
 
     function Window_ItemUseList(list) {
+      var height, width, x, y;
       this._list = list;
-      this.initialize.call(this, 0, 0, 252, 300);
+      width = 282;
+      height = 392;
+      x = (Graphics.boxWidth - width) / 2;
+      y = (Graphics.boxHeight - height) / 2;
+      this.initialize.call(this, x, y, width, height);
       this.refresh();
     }
 
@@ -355,7 +549,6 @@
     };
 
     Window_ItemUseList.prototype.setList = function(value) {
-      console.log("called");
       this._list = value;
       this.select(0);
       return this.refresh();

@@ -7,8 +7,9 @@
     @desc Enemy map ID.
 ###
 
-_DungeonDesigner_Alias_Scene_Map_create = Scene_Map.prototype.create
+_DungeonDesigner_Alias_Scene_Map_createAllWindows = Scene_Map.prototype.createAllWindows
 _DungeonDesigner_Alias_Scene_Map_update = Scene_Map.prototype.update
+_DungeonDesigner_Alias_Scene_Map_onMapLoaded = Scene_Map.prototype.onMapLoaded
 _DungeonDesigner_Alias_Game_Interpreter_command301 = Game_Interpreter.prototype.command301
 
 DungeonDesignerParameters = PluginManager.parameters "DungeonDesigner"
@@ -21,12 +22,20 @@ class Game_Dungeon
 
     start: ->
         target = $gameParty.members()[0]
+        this._mapId = $gameMap._mapId
         this._hp = target.mhp
         this._maxhp = target.mhp
         this._mp = target.mmp
         this._maxmp = target.mmp
         this._isDesigningDungeon = true
+        this._usedItems = {}
+        this._usedSkills = {}
+        this._states = []
+        this._extraEvents = []
         @loadMap()
+
+    terminate: ->
+        this._isDesigningDungeon = false
 
     loadMap: ->
         id = parseInt(DungeonDesignerParameters.EnemyMap).padZero(3)
@@ -40,10 +49,36 @@ class Game_Dungeon
             continue if event == null
             ImageManager.loadCharacter(event.pages[0].image.characterName)
 
-    putEvent: (event)->
+    putEvent: (eventIndex)->
+        event = $enemyZoo.events[eventIndex]
+        dir = [null, [-1, 1], [0, 1], [1, 1], [-1, 0], [0, 0], [0, 1], [1, -1], [1, 0], [1, 1]][$gamePlayer.direction()]
+        x = $gamePlayer.x + dir[0]
+        y = $gamePlayer.y + dir[1]
+        console.log x, y
+        targetvent = {
+            id: $dataMap.events.length + this._extraEvents.length,
+            meta: event.meta,
+            name: event.name,
+            note: event.note,
+            pages: event.pages,
+            x: x,
+            y: y
+        }
+        this._extraEvents.push targetvent
 
     battle: (troop) ->
 
+    useItem: (itemIndex)->
+        item = $dataItems[itemIndex]
+        # effect item codes
+        this._usedItems[itemIndex] = 0 if !this._usedItems[itemIndex]
+        this._usedItems[itemIndex] += 1
+
+    useSkill: (skillIndex)->
+        skill = $dataSkills[skillIndex]
+        # effect skill codes
+        this._usedSkills[skillIndex] = 0 if !this._usedSkills[skillIndex]
+        this._usedSkills[skillIndex] += 1
 
 @$gameDungeon = new Game_Dungeon()
 
@@ -60,7 +95,7 @@ Scene_Map.prototype.finishDungeon = ->
 
 Scene_Map.prototype.createDungeonHintWindow = ->
     this._dungeonHintWindow = new Window_DungeonHint()
-    @addChild this._dungeonHintWindow
+    @addWindow this._dungeonHintWindow
 
 Scene_Map.prototype.callDungeonMenu = ->
     SceneManager.push Scene_Dungeon
@@ -71,8 +106,15 @@ Scene_Map.prototype.dungeonPressed = ->
     else
         @startDungeon()
 
-Scene_Map.prototype.create = ->
-    _DungeonDesigner_Alias_Scene_Map_create.call this
+Scene_Map.prototype.onMapLoaded = ->
+    if $gameMap._mapId == $gameDungeon._mapId
+        $dataMap.events = $dataMap.events.concat $gameDungeon._extraEvents
+        $gameMap.setup $dataMap._mapId
+        console.log $dataMap.events, $gameDungeon._extraEvents
+    _DungeonDesigner_Alias_Scene_Map_onMapLoaded.call this
+
+Scene_Map.prototype.createAllWindows = ->
+    _DungeonDesigner_Alias_Scene_Map_createAllWindows.call this
     @createDungeonHintWindow() if $gameDungeon._isDesigningDungeon
 
 Scene_Map.prototype.update = ->
@@ -108,7 +150,9 @@ Window_Base.prototype.drawCharacter = (characterName, characterIndex, x, y, px, 
 class Window_DungeonHint extends Window_Base
     constructor: ->
         width = 350
-        height = @lineHeight() * 2 + @standardPadding() * 2
+        itemLength = Object.keys($gameDungeon._usedItems).length
+        skillLength = Object.keys($gameDungeon._usedSkills).length
+        height = @lineHeight() * (2 + itemLength + skillLength) + @standardPadding() * 2
         x = Graphics.boxWidth - width
         y = 0
         @initialize.call this, x, y, width, height
@@ -117,34 +161,135 @@ class Window_DungeonHint extends Window_Base
     refresh: ->
         @contents.drawText " 当前 HP #{$gameDungeon._hp} / #{$gameDungeon._maxhp}", 0, 0, @contents.width, @lineHeight()
         @contents.drawText " 当前 MP #{$gameDungeon._mp} / #{$gameDungeon._maxmp}", 0, @lineHeight(), @contents.width, @lineHeight()
+        index = 2
+        for itemIndex in Object.keys $gameDungeon._usedItems
+            item = $dataItems[itemIndex]
+            y = index * @lineHeight()
+            @drawItemName item, 0, y, @contents.width
+            @contents.drawText $gameDungeon._usedItems[itemIndex].toString(), 0, y, @contents.width, @lineHeight(), 'right'
+            index += 1
+        for skillIndex in Object.keys $gameDungeon._usedSkills
+            skill = $dataSkills[skillIndex]
+            y = index * @lineHeight()
+            @drawItemName skill, 0, y, @contents.width
+            @contents.drawText $gameDungeon._usedSkills[skillIndex].toString(), 0, y, @contents.width, @lineHeight(), 'right'
+            index += 1
 
 class Scene_Dungeon extends Scene_MenuBase
     constructor: ->
         @initialize.call this
         $gameDungeon.preloadCharacters()
+        @state = 'command'
     
     create: ->
         Scene_MenuBase.prototype.create.call this
         @createWindows()
 
     createWindows: ->
+        @createCommandWindow()
+        @createItemWindow()
+        @createEventWindow()
+
+    createCommandWindow: ->
         this._commandWindow = new Window_DungeonMenu()
         this._windowLayer.addChild this._commandWindow
+        this._commandWindow.setHandler 'event', this.commandEvent.bind this
+        this._commandWindow.setHandler 'item', this.commandItem.bind this
+        this._commandWindow.setHandler 'skill', this.commandSkill.bind this
+        this._commandWindow.setHandler 'exit',  this.commandExit.bind this
+        this._commandWindow.setHandler 'cancel', this.cancelCommand.bind this
+
+    createEventWindow: ->
         this._eventWindow = new Window_PutEnemyEvent()
         this._eventWindow.openness = 0
+        this._eventWindow.setHandler 'ok', this.useEvent.bind this
+        this._eventWindow.setHandler 'cancel', this.cancelEvent.bind this
         this._windowLayer.addChild this._eventWindow
+
+    createItemWindow: ->
         this._itemWindow = new Window_ItemUseList($dataSkills)
-        this._itemWindow.list = $dataItems
+        this._itemWindow.openness = 0
+        this._itemWindow.setHandler 'ok', this.useObject.bind this
+        this._itemWindow.setHandler 'cancel', this.cancelItem.bind this
         this._windowLayer.addChild this._itemWindow
-        this._itemWindow.active = true
+
+    commandEvent: ->
+        @switchState 'event'
+
+    commandItem: ->
+        @switchState 'item'
+
+    commandSkill: ->
+        @switchState 'skill'
+
+    commandExit: ->
+        $gameDungeon.terminate()
+        SceneManager.pop()
+
+    cancelEvent: ->
+        @switchState 'command'
+
+    cancelItem: ->
+        @switchState 'command'
+
+    cancelCommand: ->
+        SceneManager.pop()
+
+    useEvent: ->
+        $gameDungeon.putEvent this._eventWindow.index() + 1
+        SceneManager.pop()
+
+    useObject: ->
+        if @state == 'item'
+            @useItem()
+        else if @state == 'skill'
+            @useSkill()    
+
+    useItem: ->
+        $gameDungeon.useItem this._itemWindow.index() + 1
+        SceneManager.pop()
+
+    useSkill: ->    
+        $gameDungeon.useSkill this._itemWindow.index() + 1
+        SceneManager.pop()
+
+    switchState: (state) ->
+        switch state
+            when 'event'
+                this._eventWindow.activate()
+                this._eventWindow.open()
+                this._eventWindow.select 0
+                this._commandWindow.close()
+            when 'item'
+                this._itemWindow.list = $dataItems
+                this._itemWindow.open()
+                this._itemWindow.select 0
+                this._itemWindow.activate()
+                this._commandWindow.close()
+            when 'skill'
+                this._itemWindow.list = $dataSkills
+                this._itemWindow.open()
+                this._itemWindow.select 0
+                this._itemWindow.activate()
+                this._commandWindow.close()
+            when 'command'
+                this._itemWindow.close()
+                this._eventWindow.close()
+                this._commandWindow.open()
+                this._commandWindow.activate()
+        @state = state
 
     update: ->
         Scene_MenuBase.prototype.update.call this
         @updateKeys()
 
     updateKeys: ->
-        SceneManager.pop() if Input.isTriggered 'cancel'
-
+        if Input.isTriggered 'cancel'
+            if @state == 'command'
+                SceneManager.pop()
+            else
+                @switchState 'command'
+        
 
 class Window_DungeonMenu extends Window_Command
     constructor: ->
@@ -153,7 +298,7 @@ class Window_DungeonMenu extends Window_Command
         this.y = (Graphics.boxHeight - this.height) / 2
 
     makeCommandList: ->
-        @addCommand "在面前放置事件", 'enemy'
+        @addCommand "在面前放置事件", 'event'
         @addCommand "使用物品", 'item'
         @addCommand "使用技能", 'skill'
         @addCommand "生成敌机地图", "createMap", false
@@ -163,7 +308,9 @@ class Window_PutEnemyEvent extends Window_Selectable
     constructor: ->
         width = @windowWidth()
         height = @windowHeight()
-        @initialize.call this, 0, 0, width, height
+        x = (Graphics.boxWidth - width) / 2
+        y = (Graphics.boxHeight - height) / 2
+        @initialize.call this, x, y, width, height
         @refresh()
         # 计数器
         this._order = 0
@@ -220,7 +367,11 @@ class Window_PutEnemyEvent extends Window_Selectable
 class Window_ItemUseList extends Window_Selectable
     constructor: (list) ->
         this._list = list
-        @initialize.call this, 0, 0, 252, 300
+        width = 282
+        height = 392
+        x = (Graphics.boxWidth - width) / 2
+        y = (Graphics.boxHeight - height) / 2
+        @initialize.call this, x, y, width, height
         @refresh()
 
     drawItem: (index)->
@@ -238,7 +389,6 @@ class Window_ItemUseList extends Window_Selectable
         this._list
 
     setList: (value) ->
-        console.log "called"
         this._list = value
         @select 0
         @refresh()
