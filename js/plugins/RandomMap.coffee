@@ -169,7 +169,6 @@ class RandomMapManager.MapSource
     constructor: (dataMap) ->
         @width = dataMap.width
         @height = dataMap.height
-        #dataMap.meta = {}
         DataManager.extractMetadata dataMap if !dataMap.meta
         @blockWidth = parseInt(dataMap.meta.blockWidth) || 5
         @blockHeight = parseInt(dataMap.meta.blockHeight) || 5
@@ -208,6 +207,7 @@ class RandomMapManager.MapSource
                     @mapEvents[startIndex] = [] if !@mapEvents[startIndex]
                     @mapEvents[startIndex].push event
                     break
+        0
 
     inArea: (x, y, areaStartIndex)->
         areaStartY = Math.floor areaStartIndex / @width
@@ -256,6 +256,8 @@ class RandomMapManager.MapSource
                 entrance = j if areaId == RandomMapManager.constantAreaEntrance
                 @copyMapData startIndex, mapData, i * @blockWidth, j * @blockHeight, mapWidth, mapHeight
                 @copyEventData startIndex, eventData, i * @blockWidth, j * @blockHeight
+        $gameMap._lastRandomMazeMapData = mapData
+        $gameMap._lastRandomMazeEventData = eventData
         entrance = entrance || 0
         entrance * @blockHeight + @entrancePosition
 
@@ -273,7 +275,7 @@ RandomMapManager.MapSource.loadMapByFs = (id)->
 
 RandomMapManager.makeEntranceAndExit = (map)->
     # Entrance Only on left
-    entrance = Math.randomIntWithMinMax 0, (map.length - 3) / 2
+    entrance = Math.randomIntWithMinMax 0, (map.length - 5) / 2
     map[entrance * 2 + 1][0] = RandomMapManager.constantEntranceFlag
     #map[entrance * 2 + 1][2] = RandomMapManager.constantPass
     # Exit Only on right
@@ -321,6 +323,7 @@ Game_Interpreter.prototype.pluginCommand = (command, args) ->
 
 Scene_Map.prototype.IsReady = ->
     if (!this._mapLoaded && DataManager.isMapLoaded())
+        DataManager.extractMetadata $dataMap if !$dataMap.meta
         if $dataMap.meta.randomMaze
             if !DataManager.isSourceMapLoaded
                 console.log 'No source maze map when ready check. Did you set the maze?'
@@ -330,14 +333,20 @@ Scene_Map.prototype.IsReady = ->
     this._mapLoaded && Scene_Base.prototype.isReady.call(this);
 
 Scene_Map.prototype.onMapLoaded = ->
+    DataManager.extractMetadata $dataMap if !$dataMap.meta
     if $dataMap.meta.randomMaze
-        size = eval $dataMap.meta.randomMaze
-        area = RandomMapManager.generateAreaArrayByPrim size[0], size[1]
-        $sourceMap.source = new RandomMapManager.MapSource $sourceMap if !$sourceMap.source
-        $gamePlayer._newY = $sourceMap.source.generateMap area
-    if (this._transfer)
-        $gamePlayer.performTransfer();
-    @createDisplayObjects();
+        if this._transfer
+            size = eval $dataMap.meta.randomMaze
+            area = RandomMapManager.generateAreaArrayByPrim size[0], size[1]
+            $sourceMap.source = new RandomMapManager.MapSource $sourceMap if !$sourceMap.source
+            $gamePlayer._newY = $sourceMap.source.generateMap area
+        else
+            $dataMap.data = $gameMap._lastRandomMazeMapData if $gameMap._lastRandomMazeMapData
+            $dataMap.events = $gameMap._lastRandomMazeEventData if $gameMap._lastRandomMazeEventData
+    else
+        $gameMap._lastRandomMazeEventData = null if $gameMap._lastRandomMazeEventData
+        $gameMap._lastRandomMazeMapData = null if $gameMap._lastRandomMazeMapData
+    _RandomMap_Alias_Scene_Map_onMapLoaded.call this
 
 DataManager.isSourceMapLoaded = ->
     @checkError()    

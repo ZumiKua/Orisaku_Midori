@@ -67,16 +67,17 @@ class Game_Dungeon
         this._extraEvents.push targetvent
 
     battle: (troop) ->
+        # TODO: battle codes
 
     useItem: (itemIndex)->
         item = $dataItems[itemIndex]
-        # effect item codes
+        # TODO: effect item codes
         this._usedItems[itemIndex] = 0 if !this._usedItems[itemIndex]
         this._usedItems[itemIndex] += 1
 
     useSkill: (skillIndex)->
         skill = $dataSkills[skillIndex]
-        # effect skill codes
+        # TODO: effect skill codes
         this._usedSkills[skillIndex] = 0 if !this._usedSkills[skillIndex]
         this._usedSkills[skillIndex] += 1
 
@@ -109,7 +110,7 @@ Scene_Map.prototype.dungeonPressed = ->
 Scene_Map.prototype.onMapLoaded = ->
     if $gameMap._mapId == $gameDungeon._mapId
         $dataMap.events = $dataMap.events.concat $gameDungeon._extraEvents
-        $gameMap.setup $dataMap._mapId
+        $gameMap.setupEvents()
         console.log $dataMap.events, $gameDungeon._extraEvents
     _DungeonDesigner_Alias_Scene_Map_onMapLoaded.call this
 
@@ -197,6 +198,7 @@ class Scene_Dungeon extends Scene_MenuBase
         this._commandWindow.setHandler 'item', this.commandItem.bind this
         this._commandWindow.setHandler 'skill', this.commandSkill.bind this
         this._commandWindow.setHandler 'exit',  this.commandExit.bind this
+        this._commandWindow.setHandler 'saveMap', this.commandSaveMap.bind this
         this._commandWindow.setHandler 'cancel', this.cancelCommand.bind this
 
     createEventWindow: ->
@@ -221,6 +223,18 @@ class Scene_Dungeon extends Scene_MenuBase
 
     commandSkill: ->
         @switchState 'skill'
+
+    commandSaveMap: ->
+        mapId = $gameMap.mapId()
+        dirname = window.location.pathname.replace(/(\/www|)\/[^\/]*$/, '/');
+        fileName = dirname + 'data/Map' + mapId.padZero(3) + '.json'
+        console.log fileName
+        backupFileName = fileName + '.bac'
+        fs = require 'fs'
+        fs.renameSync fileName, backupFileName
+        mapData = JSON.stringify $dataMap
+        fs.writeFileSync fileName, mapData
+        SceneManager.pop()
 
     commandExit: ->
         $gameDungeon.terminate()
@@ -302,6 +316,7 @@ class Window_DungeonMenu extends Window_Command
         @addCommand "使用物品", 'item'
         @addCommand "使用技能", 'skill'
         @addCommand "生成敌机地图", "createMap", false
+        @addCommand "保存当前地图", "saveMap"
         @addCommand "退出设计模式", 'exit'
 
 class Window_PutEnemyEvent extends Window_Selectable

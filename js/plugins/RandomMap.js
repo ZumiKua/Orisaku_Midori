@@ -313,8 +313,7 @@
     };
 
     MapSource.prototype.analyzeEvents = function(events) {
-      var area, event, startIndex, _i, _len, _results;
-      _results = [];
+      var area, event, startIndex, _i, _j, _len, _len1, _ref;
       for (_i = 0, _len = events.length; _i < _len; _i++) {
         event = events[_i];
         if (!event) {
@@ -324,26 +323,19 @@
         if (!this.mapElements[area]) {
           next;
         }
-        _results.push((function() {
-          var _j, _len1, _ref, _results1;
-          _ref = this.mapElements[area];
-          _results1 = [];
-          for (_j = 0, _len1 = _ref.length; _j < _len1; _j++) {
-            startIndex = _ref[_j];
-            if (this.inArea(event.x, event.y, startIndex)) {
-              if (!this.mapEvents[startIndex]) {
-                this.mapEvents[startIndex] = [];
-              }
-              this.mapEvents[startIndex].push(event);
-              break;
-            } else {
-              _results1.push(void 0);
+        _ref = this.mapElements[area];
+        for (_j = 0, _len1 = _ref.length; _j < _len1; _j++) {
+          startIndex = _ref[_j];
+          if (this.inArea(event.x, event.y, startIndex)) {
+            if (!this.mapEvents[startIndex]) {
+              this.mapEvents[startIndex] = [];
             }
+            this.mapEvents[startIndex].push(event);
+            break;
           }
-          return _results1;
-        }).call(this));
+        }
       }
-      return _results;
+      return 0;
     };
 
     MapSource.prototype.inArea = function(x, y, areaStartIndex) {
@@ -417,6 +409,8 @@
           this.copyEventData(startIndex, eventData, i * this.blockWidth, j * this.blockHeight);
         }
       }
+      $gameMap._lastRandomMazeMapData = mapData;
+      $gameMap._lastRandomMazeEventData = eventData;
       entrance = entrance || 0;
       return entrance * this.blockHeight + this.entrancePosition;
     };
@@ -447,7 +441,7 @@
 
   RandomMapManager.makeEntranceAndExit = function(map) {
     var entrance, exit;
-    entrance = Math.randomIntWithMinMax(0, (map.length - 3) / 2);
+    entrance = Math.randomIntWithMinMax(0, (map.length - 5) / 2);
     map[entrance * 2 + 1][0] = RandomMapManager.constantEntranceFlag;
     exit = Math.randomIntWithMinMax(0, (map.length - 3) / 2);
     return map[exit * 2 + 1][map[0].length - 1] = RandomMapManager.constantExitFlag;
@@ -504,6 +498,9 @@
 
   Scene_Map.prototype.IsReady = function() {
     if (!this._mapLoaded && DataManager.isMapLoaded()) {
+      if (!$dataMap.meta) {
+        DataManager.extractMetadata($dataMap);
+      }
       if ($dataMap.meta.randomMaze) {
         if (!DataManager.isSourceMapLoaded) {
           console.log('No source maze map when ready check. Did you set the maze?');
@@ -518,18 +515,34 @@
 
   Scene_Map.prototype.onMapLoaded = function() {
     var area, size;
+    if (!$dataMap.meta) {
+      DataManager.extractMetadata($dataMap);
+    }
     if ($dataMap.meta.randomMaze) {
-      size = eval($dataMap.meta.randomMaze);
-      area = RandomMapManager.generateAreaArrayByPrim(size[0], size[1]);
-      if (!$sourceMap.source) {
-        $sourceMap.source = new RandomMapManager.MapSource($sourceMap);
+      if (this._transfer) {
+        size = eval($dataMap.meta.randomMaze);
+        area = RandomMapManager.generateAreaArrayByPrim(size[0], size[1]);
+        if (!$sourceMap.source) {
+          $sourceMap.source = new RandomMapManager.MapSource($sourceMap);
+        }
+        $gamePlayer._newY = $sourceMap.source.generateMap(area);
+      } else {
+        if ($gameMap._lastRandomMazeMapData) {
+          $dataMap.data = $gameMap._lastRandomMazeMapData;
+        }
+        if ($gameMap._lastRandomMazeEventData) {
+          $dataMap.events = $gameMap._lastRandomMazeEventData;
+        }
       }
-      $gamePlayer._newY = $sourceMap.source.generateMap(area);
+    } else {
+      if ($gameMap._lastRandomMazeEventData) {
+        $gameMap._lastRandomMazeEventData = null;
+      }
+      if ($gameMap._lastRandomMazeMapData) {
+        $gameMap._lastRandomMazeMapData = null;
+      }
     }
-    if (this._transfer) {
-      $gamePlayer.performTransfer();
-    }
-    return this.createDisplayObjects();
+    return _RandomMap_Alias_Scene_Map_onMapLoaded.call(this);
   };
 
   DataManager.isSourceMapLoaded = function() {

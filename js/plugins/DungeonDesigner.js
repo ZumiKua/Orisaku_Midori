@@ -155,7 +155,7 @@
   Scene_Map.prototype.onMapLoaded = function() {
     if ($gameMap._mapId === $gameDungeon._mapId) {
       $dataMap.events = $dataMap.events.concat($gameDungeon._extraEvents);
-      $gameMap.setup($dataMap._mapId);
+      $gameMap.setupEvents();
       console.log($dataMap.events, $gameDungeon._extraEvents);
     }
     return _DungeonDesigner_Alias_Scene_Map_onMapLoaded.call(this);
@@ -279,6 +279,7 @@
       this._commandWindow.setHandler('item', this.commandItem.bind(this));
       this._commandWindow.setHandler('skill', this.commandSkill.bind(this));
       this._commandWindow.setHandler('exit', this.commandExit.bind(this));
+      this._commandWindow.setHandler('saveMap', this.commandSaveMap.bind(this));
       return this._commandWindow.setHandler('cancel', this.cancelCommand.bind(this));
     };
 
@@ -308,6 +309,20 @@
 
     Scene_Dungeon.prototype.commandSkill = function() {
       return this.switchState('skill');
+    };
+
+    Scene_Dungeon.prototype.commandSaveMap = function() {
+      var backupFileName, dirname, fileName, fs, mapData, mapId;
+      mapId = $gameMap.mapId();
+      dirname = window.location.pathname.replace(/(\/www|)\/[^\/]*$/, '/');
+      fileName = dirname + 'data/Map' + mapId.padZero(3) + '.json';
+      console.log(fileName);
+      backupFileName = fileName + '.bac';
+      fs = require('fs');
+      fs.renameSync(fileName, backupFileName);
+      mapData = JSON.stringify($dataMap);
+      fs.writeFileSync(fileName, mapData);
+      return SceneManager.pop();
     };
 
     Scene_Dungeon.prototype.commandExit = function() {
@@ -414,6 +429,7 @@
       this.addCommand("使用物品", 'item');
       this.addCommand("使用技能", 'skill');
       this.addCommand("生成敌机地图", "createMap", false);
+      this.addCommand("保存当前地图", "saveMap");
       return this.addCommand("退出设计模式", 'exit');
     };
 
