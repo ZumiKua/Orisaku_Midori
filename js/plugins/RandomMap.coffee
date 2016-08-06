@@ -323,6 +323,7 @@ Game_Interpreter.prototype.pluginCommand = (command, args) ->
 
 Scene_Map.prototype.IsReady = ->
     if (!this._mapLoaded && DataManager.isMapLoaded())
+        DataManager.extractMetadata $dataMap if !$dataMap.meta
         if $dataMap.meta.randomMaze
             if !DataManager.isSourceMapLoaded
                 console.log 'No source maze map when ready check. Did you set the maze?'
@@ -332,6 +333,7 @@ Scene_Map.prototype.IsReady = ->
     this._mapLoaded && Scene_Base.prototype.isReady.call(this);
 
 Scene_Map.prototype.onMapLoaded = ->
+    DataManager.extractMetadata $dataMap if !$dataMap.meta
     if $dataMap.meta.randomMaze
         if this._transfer
             size = eval $dataMap.meta.randomMaze

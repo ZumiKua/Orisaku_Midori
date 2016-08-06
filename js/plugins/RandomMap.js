@@ -498,6 +498,9 @@
 
   Scene_Map.prototype.IsReady = function() {
     if (!this._mapLoaded && DataManager.isMapLoaded()) {
+      if (!$dataMap.meta) {
+        DataManager.extractMetadata($dataMap);
+      }
       if ($dataMap.meta.randomMaze) {
         if (!DataManager.isSourceMapLoaded) {
           console.log('No source maze map when ready check. Did you set the maze?');
@@ -512,6 +515,9 @@
 
   Scene_Map.prototype.onMapLoaded = function() {
     var area, size;
+    if (!$dataMap.meta) {
+      DataManager.extractMetadata($dataMap);
+    }
     if ($dataMap.meta.randomMaze) {
       if (this._transfer) {
         size = eval($dataMap.meta.randomMaze);
