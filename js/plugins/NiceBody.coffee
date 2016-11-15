@@ -103,6 +103,7 @@ class @NiceBody extends @Sprite_Base
     #for sprite in @sprites
     #  sprite.blendMode = PIXI.blendModes.NORMAL
     #  @addChild(sprite)
+    @bitmap = new Bitmap(@pic_width,@pic_height)
     @refresh()
   playExpressHitted: ()->
     @express = @hitted_express
@@ -144,34 +145,27 @@ class @NiceBody extends @Sprite_Base
     ImageManager.loadPicture(fn)
 
   refresh: ()->
-    @bitmap = new Bitmap(@pic_width,@pic_height)
+
     srcs = []
     already_blted = false
+    startBlt = ()->
+      console.log("into start blt")
+      return if already_blted
+      console.log("not blted")
+      for src in srcs
+        return unless src.isReady()
+      console.log("start blt")
+      already_blted = true
+      @bitmap.clear()
+      for src in srcs
+        @bitmap.blt(src,0,0,@pic_width,@pic_height,0,0)
     for elem,i in @orders
       srcs[i] = @generateBitmap(elem)
     for elem,i in @orders
-      srcs[i].addLoadListener(((self)->
-          return if already_blted
-          flag = true
-          for src in srcs
-            if(!src.isReady())
-              flag = false
-          if flag
-            already_blted = true
-            console.log(self)
-            for src in srcs
-              @bitmap.blt(src,0,0,@pic_width,@pic_height,0,0)
-          0
-        ).bind(this,srcs[i]))
-    fflag = true
-    for src in srcs
-      if(!src.isReady())
-        fflag = false
-    if fflag
-      already_blted = true
-      for src in srcs
-        @bitmap.blt(src,0,0,@pic_width,@pic_height,0,0)
+      srcs[i].addLoadListener(startBlt.bind(this))
+    startBlt()
     @old_express = @express
+
   update4Battle: ()->
     while (@_actor.isAnimationRequested())
       console.log(@_actor._animations)

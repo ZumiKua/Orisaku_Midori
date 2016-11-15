@@ -126,6 +126,7 @@ this.NiceBody = (function(superClass) {
     this.pic_height = Number(parameters['HEIGHT'] || 624);
     this.x = Graphics.width - 120 + 80;
     this.y = this.pic_height;
+    this.bitmap = new Bitmap(this.pic_width, this.pic_height);
     this.refresh();
   }
 
@@ -182,10 +183,32 @@ this.NiceBody = (function(superClass) {
   };
 
   NiceBody.prototype.refresh = function() {
-    var already_blted, elem, fflag, i, j, k, l, len, len1, len2, len3, m, ref, ref1, src, srcs;
-    this.bitmap = new Bitmap(this.pic_width, this.pic_height);
+    var already_blted, elem, i, j, k, len, len1, ref, ref1, srcs, startBlt;
     srcs = [];
     already_blted = false;
+    startBlt = function() {
+      var j, k, len, len1, results, src;
+      console.log("into start blt");
+      if (already_blted) {
+        return;
+      }
+      console.log("not blted");
+      for (j = 0, len = srcs.length; j < len; j++) {
+        src = srcs[j];
+        if (!src.isReady()) {
+          return;
+        }
+      }
+      console.log("start blt");
+      already_blted = true;
+      this.bitmap.clear();
+      results = [];
+      for (k = 0, len1 = srcs.length; k < len1; k++) {
+        src = srcs[k];
+        results.push(this.bitmap.blt(src, 0, 0, this.pic_width, this.pic_height, 0, 0));
+      }
+      return results;
+    };
     ref = this.orders;
     for (i = j = 0, len = ref.length; j < len; i = ++j) {
       elem = ref[i];
@@ -194,43 +217,9 @@ this.NiceBody = (function(superClass) {
     ref1 = this.orders;
     for (i = k = 0, len1 = ref1.length; k < len1; i = ++k) {
       elem = ref1[i];
-      srcs[i].addLoadListener((function(self) {
-        var flag, l, len2, len3, m, src;
-        if (already_blted) {
-          return;
-        }
-        flag = true;
-        for (l = 0, len2 = srcs.length; l < len2; l++) {
-          src = srcs[l];
-          if (!src.isReady()) {
-            flag = false;
-          }
-        }
-        if (flag) {
-          already_blted = true;
-          console.log(self);
-          for (m = 0, len3 = srcs.length; m < len3; m++) {
-            src = srcs[m];
-            this.bitmap.blt(src, 0, 0, this.pic_width, this.pic_height, 0, 0);
-          }
-        }
-        return 0;
-      }).bind(this, srcs[i]));
+      srcs[i].addLoadListener(startBlt.bind(this));
     }
-    fflag = true;
-    for (l = 0, len2 = srcs.length; l < len2; l++) {
-      src = srcs[l];
-      if (!src.isReady()) {
-        fflag = false;
-      }
-    }
-    if (fflag) {
-      already_blted = true;
-      for (m = 0, len3 = srcs.length; m < len3; m++) {
-        src = srcs[m];
-        this.bitmap.blt(src, 0, 0, this.pic_width, this.pic_height, 0, 0);
-      }
-    }
+    startBlt();
     return this.old_express = this.express;
   };
 

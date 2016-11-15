@@ -1,22 +1,6 @@
-###
-_MessageEx_Alias_Window_Message_subWindows = @Window_Message.prototype.subWindows
-@Window_Message.prototype.subWindows = ()->
-  old = _MessageEx_Alias_Window_Message_subWindows.apply(this,arguments)
-  old.unshift @nice_body
-  old
-
-_MessageEx_Alias_Window_Message_createSubWindows =  @Window_Message.prototype.createSubWindows
-@Window_Message.prototype.createSubWindows = ()->
-  _MessageEx_Alias_Window_Message_createSubWindows.apply(this,arguments)
-  @nice_body = new NiceBody();
-
-Scene_Map.prototype.createMessageWindow = ()->
-    this._messageWindow = new Window_Message()
-    this.addChild(this._messageWindow.nice_body)
-    this.addWindow(this._messageWindow)
-    this._messageWindow.subWindows().forEach(((window)->
-        this.addWindow(window)
-    ), this);
+###:
+    @plugindesc Display character pictures when talking.
+    @author ZumiKua
 ###
 _MessageEx_Alias_Window_Message_convertEscapeCharacters = @Window_Message.prototype.convertEscapeCharacters
 @Window_Message.prototype.convertEscapeCharacters = (text)->
@@ -36,5 +20,17 @@ _MessageEx_Alias_Window_Message_convertEscapeCharacters = @Window_Message.protot
       SceneManager._scene.nice_body.express = exp
     ""
   )
-  console.log(text)
   text
+_old_terminateMessage_ = @Window_Message.prototype.terminateMessage
+@Window_Message.prototype.terminateMessage = ()->
+  #console.log(@doesContinue())
+
+  if(SceneManager._scene instanceof Scene_Map)
+    isNextMessage = false
+    nxtCode = $gameMap._interpreter.currentCommand()?.code
+    console.log(nxtCode)
+    if(nxtCode >= 101 && nxtCode <= 104 )
+      isNextMessage = true
+    unless isNextMessage
+      SceneManager._scene.nice_body?.slideOut()
+  _old_terminateMessage_.apply(this)

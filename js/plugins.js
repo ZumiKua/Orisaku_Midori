@@ -8,7 +8,7 @@ var $plugins =
 {"name":"MessageEx","status":true,"description":"","parameters":{}},
 {"name":"CraftSystem","status":true,"description":"","parameters":{}},
 {"name":"RandomMap","status":true,"description":"Generate Map randomly.","parameters":{}},
-{"name":"InventoryLimitation","status":true,"description":"","parameters":{}},
-{"name":"GainItemHint","status":true,"description":"Add a hint when you get item.","parameters":{"gainItemHint":"获得了","loseItemHint":"失去了","hintWindowDurations":"120"}},
+{"name":"InventoryLimitation","status":true,"description":"Make player's inventory has limit size.","parameters":{}},
+{"name":"GainItemHint","status":true,"description":"Add a hint when you get item.","parameters":{"gainItemHint":"获得了","loseItemHint":"失去了","boxHint":"道具箱：%NUM%","hintWindowDurations":"120"}},
 {"name":"DungeonDesigner","status":true,"description":"Help design a Dungeon","parameters":{"EnemyMap":"8"}}
 ];

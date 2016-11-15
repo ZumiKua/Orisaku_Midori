@@ -1,16 +1,23 @@
+###:
+    @plugindesc Make player's inventory has limit size.
+    @author ZumiKua
+###
+
+class Infinity_Inventory
+  members:()-> []
+  maxItems:()-> 99
+#generate prototype for infinityInventory
+for method in ["items","weapons","armors","equipItems","allItems","hasItem","hasMaxItems","gainItem","isAnyMemberEquipped","discardMembersEquip","loseItem","itemContainer","numItems"]
+  Infinity_Inventory.prototype[method] = @Game_Party.prototype[method]
+
 _infinityInventory_Alias_initAllItems = @Game_Party.prototype.initAllItems
 @Game_Party.prototype.initAllItems = ()->
   _infinityInventory_Alias_initAllItems.call(this)
-  @infinityInventory = {}
-  for method in ["items","weapons","armors","equipItems","allItems","hasItem","hasMaxItems","gainItem","isAnyMemberEquipped","discardMembersEquip","loseItem","itemContainer","numItems"]
-    @infinityInventory[method] = @[method]
+  @infinityInventory = new Infinity_Inventory()
   @infinityInventory._items = {}
   @infinityInventory._weapons = {}
   @infinityInventory._armors = {}
-  @infinityInventory.members = ()->
-    []
-  @infinityInventory.maxItems = ()->
-    99
+
 @Game_Party.prototype.maxItems =(item)->
   Number(item.meta.maxNum || 99)
 @Game_Party.prototype.transferItems = (src,dest,item,count)->
@@ -29,8 +36,9 @@ _infinityInventory_Alias_gainItem = @Game_Party.prototype.gainItem
   if this instanceof Game_Party
     if @numItems(item) + count > @maxItems(item)
       boxCount = count - (@maxItems(item) - @numItems(item))
+      boxCount = 0 if boxCount < 0
       count -= boxCount
-      @infinityInventory.gainItem(item,boxCount,includeEquip)
+      @infinityInventory.gainItem(item,boxCount,includeEquip) if boxCount > 0
     _infinityInventory_Alias_gainItem.call(this,item,count,includeEquip)
     [count,boxCount]
   else

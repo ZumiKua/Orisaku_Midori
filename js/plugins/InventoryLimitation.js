@@ -1,27 +1,41 @@
-var Window_TransferItemList, Window_TransferNumber, _infinityInventory_Alias_gainItem, _infinityInventory_Alias_initAllItems,
+
+/*:
+    @plugindesc Make player's inventory has limit size.
+    @author ZumiKua
+ */
+var Infinity_Inventory, Window_TransferItemList, Window_TransferNumber, _infinityInventory_Alias_gainItem, _infinityInventory_Alias_initAllItems, i, len, method, ref,
   extend = function(child, parent) { for (var key in parent) { if (hasProp.call(parent, key)) child[key] = parent[key]; } function ctor() { this.constructor = child; } ctor.prototype = parent.prototype; child.prototype = new ctor(); child.__super__ = parent.prototype; return child; },
   hasProp = {}.hasOwnProperty;
+
+Infinity_Inventory = (function() {
+  function Infinity_Inventory() {}
+
+  Infinity_Inventory.prototype.members = function() {
+    return [];
+  };
+
+  Infinity_Inventory.prototype.maxItems = function() {
+    return 99;
+  };
+
+  return Infinity_Inventory;
+
+})();
+
+ref = ["items", "weapons", "armors", "equipItems", "allItems", "hasItem", "hasMaxItems", "gainItem", "isAnyMemberEquipped", "discardMembersEquip", "loseItem", "itemContainer", "numItems"];
+for (i = 0, len = ref.length; i < len; i++) {
+  method = ref[i];
+  Infinity_Inventory.prototype[method] = this.Game_Party.prototype[method];
+}
 
 _infinityInventory_Alias_initAllItems = this.Game_Party.prototype.initAllItems;
 
 this.Game_Party.prototype.initAllItems = function() {
-  var i, len, method, ref;
   _infinityInventory_Alias_initAllItems.call(this);
-  this.infinityInventory = {};
-  ref = ["items", "weapons", "armors", "equipItems", "allItems", "hasItem", "hasMaxItems", "gainItem", "isAnyMemberEquipped", "discardMembersEquip", "loseItem", "itemContainer", "numItems"];
-  for (i = 0, len = ref.length; i < len; i++) {
-    method = ref[i];
-    this.infinityInventory[method] = this[method];
-  }
+  this.infinityInventory = new Infinity_Inventory();
   this.infinityInventory._items = {};
   this.infinityInventory._weapons = {};
-  this.infinityInventory._armors = {};
-  this.infinityInventory.members = function() {
-    return [];
-  };
-  return this.infinityInventory.maxItems = function() {
-    return 99;
-  };
+  return this.infinityInventory._armors = {};
 };
 
 this.Game_Party.prototype.maxItems = function(item) {
@@ -54,8 +68,13 @@ this.Game_Party.prototype.gainItem = function(item, count, includeEquip) {
   if (this instanceof Game_Party) {
     if (this.numItems(item) + count > this.maxItems(item)) {
       boxCount = count - (this.maxItems(item) - this.numItems(item));
+      if (boxCount < 0) {
+        boxCount = 0;
+      }
       count -= boxCount;
-      this.infinityInventory.gainItem(item, boxCount, includeEquip);
+      if (boxCount > 0) {
+        this.infinityInventory.gainItem(item, boxCount, includeEquip);
+      }
     }
     _infinityInventory_Alias_gainItem.call(this, item, count, includeEquip);
     return [count, boxCount];

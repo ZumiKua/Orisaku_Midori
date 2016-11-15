@@ -1,25 +1,9 @@
 
-/*
-_MessageEx_Alias_Window_Message_subWindows = @Window_Message.prototype.subWindows
-@Window_Message.prototype.subWindows = ()->
-  old = _MessageEx_Alias_Window_Message_subWindows.apply(this,arguments)
-  old.unshift @nice_body
-  old
-
-_MessageEx_Alias_Window_Message_createSubWindows =  @Window_Message.prototype.createSubWindows
-@Window_Message.prototype.createSubWindows = ()->
-  _MessageEx_Alias_Window_Message_createSubWindows.apply(this,arguments)
-  @nice_body = new NiceBody();
-
-Scene_Map.prototype.createMessageWindow = ()->
-    this._messageWindow = new Window_Message()
-    this.addChild(this._messageWindow.nice_body)
-    this.addWindow(this._messageWindow)
-    this._messageWindow.subWindows().forEach(((window)->
-        this.addWindow(window)
-    ), this);
+/*:
+    @plugindesc Display character pictures when talking.
+    @author ZumiKua
  */
-var _MessageEx_Alias_Window_Message_convertEscapeCharacters;
+var _MessageEx_Alias_Window_Message_convertEscapeCharacters, _old_terminateMessage_;
 
 _MessageEx_Alias_Window_Message_convertEscapeCharacters = this.Window_Message.prototype.convertEscapeCharacters;
 
@@ -43,6 +27,25 @@ this.Window_Message.prototype.convertEscapeCharacters = function(text) {
     }
     return "";
   });
-  console.log(text);
   return text;
+};
+
+_old_terminateMessage_ = this.Window_Message.prototype.terminateMessage;
+
+this.Window_Message.prototype.terminateMessage = function() {
+  var isNextMessage, nxtCode, ref, ref1;
+  if (SceneManager._scene instanceof Scene_Map) {
+    isNextMessage = false;
+    nxtCode = (ref = $gameMap._interpreter.currentCommand()) != null ? ref.code : void 0;
+    console.log(nxtCode);
+    if (nxtCode >= 101 && nxtCode <= 104) {
+      isNextMessage = true;
+    }
+    if (!isNextMessage) {
+      if ((ref1 = SceneManager._scene.nice_body) != null) {
+        ref1.slideOut();
+      }
+    }
+  }
+  return _old_terminateMessage_.apply(this);
 };

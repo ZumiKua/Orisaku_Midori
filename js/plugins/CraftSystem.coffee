@@ -1,3 +1,7 @@
+###:
+    @plugindesc Add a Craft System
+    @author ZumiKua
+###
 @Game_Party.prototype.checkFormulation = (formulation)->
   flag = true
   for ingredient in formulation[1]
@@ -13,11 +17,15 @@
     for ingredient in formulation[1]
       @gainItem(ingredient[0],-ingredient[1])
   return true
+
 class Window_CraftHint extends @Window_Base
+
   constructor: ()->
     @initialize()
+
   initialize: ()->
     Window_Base.prototype.initialize.call(this, 0, Graphics.height / 2, Graphics.width, Graphics.height / 4);
+
   refresh: (formulation)->
     @contents.clear()
     return if !formulation
@@ -43,35 +51,44 @@ class Window_CraftHint extends @Window_Base
       @changePaintOpacity(true)
       x -= ww
       @drawText('(',x-one_letter_width,y,one_letter_width)
+
 class Window_Formulation extends @Window_Selectable
+
   constructor: (@formulations,@hint_window,@help_window)->
     @initialize(0,0,Graphics.width,Graphics.height/2)
     @refresh()
     @select(0)
     @activate()
+
   select: (index)->
     super(index)
     @hint_window.refresh(@formulations[index])
     if @formulations[index]
       @help_window.setItem(@formulations[index][0])
+
   maxCols: ()->
     2
+
   maxItems: ()->
     @formulations.length
+
   getFormulation: ()->
     if @formulations
       @formulations[@index()]
     else
       null
+
   refresh: ()->
     super()
     @hint_window.refresh(@getFormulation())
     @help_window.setItem(@getFormulation()[0]) if @getFormulation()
+
   drawItem: (index)->
     if(index < @formulations.length)
       rect = @itemRectForText(index)
       @changePaintOpacity($gameParty.checkFormulation(@formulations[index]))
       @drawItemName(@formulations[index][0],rect.x,rect.y,rect.width)
+
 class @Scene_Craft extends @Scene_Base
   parse_formulation: (text)->
     formulation = []
@@ -85,9 +102,7 @@ class @Scene_Craft extends @Scene_Base
       if item
         if formulation_text = item.meta.craft
           for text in formulation_text.split('|')
-            console.log(text)
             formulations.push([item,@parse_formulation(text)])
-            console.log(formulations[formulations.length - 1])
     formulations
   constructor: ()->
     @initialize()
@@ -100,6 +115,9 @@ class @Scene_Craft extends @Scene_Base
     @formulation_window.activate()
   create: ()->
     super()
+    @bg = new Sprite()
+    @bg.bitmap = SceneManager.backgroundBitmap()
+    @addChild(@bg)
     @formulations = @gather_formulations()
     @createWindowLayer()
     @createHintWindow()
