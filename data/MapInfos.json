@@ -4,7 +4,7 @@ null,
 {"id":2,"expanded":false,"name":"home","order":2,"parentId":1,"scrollX":709.3333333333334,"scrollY":655.3333333333334},
 {"id":3,"expanded":false,"name":"MAP003","order":3,"parentId":1,"scrollX":819,"scrollY":461.5},
 {"id":4,"expanded":false,"name":"home","order":4,"parentId":0,"scrollX":709.3333333333334,"scrollY":594},
-{"id":5,"expanded":false,"name":"ScriptTesterMAP","order":5,"parentId":0,"scrollX":720,"scrollY":400.6666666666667},
+{"id":5,"expanded":false,"name":"ScriptTesterMAP","order":5,"parentId":0,"scrollX":606,"scrollY":421.5},
 {"id":6,"expanded":true,"name":"MazeSource","order":6,"parentId":0,"scrollX":6266.666666666667,"scrollY":3676.6666666666665},
 {"id":7,"expanded":false,"name":"TestMap","order":7,"parentId":6,"scrollX":894.6666666666666,"scrollY":4447.333333333333},
 {"id":8,"expanded":false,"name":"EnemyZoo","order":8,"parentId":6,"scrollX":720,"scrollY":406.6666666666667}
