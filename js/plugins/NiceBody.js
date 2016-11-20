@@ -127,6 +127,7 @@ this.NiceBody = (function(superClass) {
     this.x = Graphics.width - 120 + 80;
     this.y = this.pic_height;
     this.bitmap = new Bitmap(this.pic_width, this.pic_height);
+    this.alreadySlidedIn = false;
     this.refresh();
   }
 
@@ -139,7 +140,6 @@ this.NiceBody = (function(superClass) {
   };
 
   NiceBody.prototype.playBattleExpress = function(sub, targets) {
-    console.log(targets);
     if (sub === this._actor) {
       if (targets && targets.indexOf(this._actor) < 0) {
         this.playExpressAttack();
@@ -188,18 +188,15 @@ this.NiceBody = (function(superClass) {
     already_blted = false;
     startBlt = function() {
       var j, k, len, len1, results, src;
-      console.log("into start blt");
       if (already_blted) {
         return;
       }
-      console.log("not blted");
       for (j = 0, len = srcs.length; j < len; j++) {
         src = srcs[j];
         if (!src.isReady()) {
           return;
         }
       }
-      console.log("start blt");
       already_blted = true;
       this.bitmap.clear();
       results = [];
@@ -227,7 +224,6 @@ this.NiceBody = (function(superClass) {
     var animation, data, delay, mirror, results;
     results = [];
     while (this._actor.isAnimationRequested()) {
-      console.log(this._actor._animations);
       data = this._actor.shiftAnimation(true);
       animation = $dataAnimations[data.animationId];
       mirror = data.mirror;
@@ -246,24 +242,6 @@ this.NiceBody = (function(superClass) {
       this.refresh();
       this.old_express = this.express;
     }
-    if (this.showing) {
-      this.x -= 10;
-      this.opacity += 25;
-      if (this.x <= Graphics.width - 120) {
-        this.x = Graphics.width - 120;
-        this.showing = false;
-        this.opacity = 255;
-      }
-    }
-    if (this.hiding) {
-      this.x += 10;
-      this.opacity -= 25;
-      if (this.x >= Graphics.width - 120 + 80) {
-        this.x = Graphics.width - 120 + 80;
-        this.hiding = false;
-        this.opacity = 0;
-      }
-    }
     if (this.back_to_normal_express) {
       this.back_to_normal_express -= 1;
       if (this.back_to_normal_express === 0) {
@@ -273,18 +251,20 @@ this.NiceBody = (function(superClass) {
     }
   };
 
-  NiceBody.prototype.slideIn = function() {
-    this.hiding = false;
-    this.showing = true;
+  NiceBody.prototype.slideIn = function(func) {
     this.opacity = 0;
-    return this.x = Graphics.width - 120 + 80;
+    this.x = Graphics.width - 120 + 80;
+    AnimateItDefaultCurve(this, "x", Graphics.width - 120, 30, "easeOut");
+    AnimateItDefaultCurve(this, "opacity", 255, 30, "easeOut", func);
+    return this.alreadySlidedIn = true;
   };
 
-  NiceBody.prototype.slideOut = function() {
-    this.showing = false;
-    this.hiding = true;
+  NiceBody.prototype.slideOut = function(func) {
     this.opacity = 255;
-    return this.x = Graphics.width - 120;
+    this.x = Graphics.width - 120;
+    AnimateItDefaultCurve(this, "x", Graphics.width, 30, "easeIn");
+    AnimateItDefaultCurve(this, "opacity", 0, 30, "easeIn", func);
+    return this.alreadySlidedIn = false;
   };
 
   return NiceBody;

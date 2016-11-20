@@ -11,5 +11,8 @@ var $plugins =
 {"name":"InventoryLimitation","status":true,"description":"Make player's inventory has limit size.","parameters":{}},
 {"name":"GainItemHint","status":true,"description":"Add a hint when you get item.","parameters":{"gainItemHint":"获得了","loseItemHint":"失去了","boxHint":"道具箱：%NUM%","hintWindowDurations":"120"}},
 {"name":"DungeonDesigner","status":true,"description":"Help design a Dungeon","parameters":{"EnemyMap":"8"}},
-{"name":"highDPIFix","status":true,"description":"NW.js acts wired under high-DPI screen and scale enabled.(Size is not right). This plugin trys to fix this bug.","parameters":{}}
+{"name":"highDPIFix","status":true,"description":"NW.js acts wired under high-DPI screen and scale enabled.(Size is not right). This plugin trys to fix this bug.","parameters":{}},
+{"name":"Animate","status":true,"description":"A helper script trys to make the implementation of animation effects more easily and painless.","parameters":{}},
+{"name":"bezier","status":true,"description":"","parameters":{}},
+{"name":"mustDo","status":true,"description":"Make sure some code must be done whether the bitmap is loaded or not.","parameters":{}}
 ];

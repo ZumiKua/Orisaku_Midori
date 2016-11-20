@@ -104,13 +104,13 @@ class @NiceBody extends @Sprite_Base
     #  sprite.blendMode = PIXI.blendModes.NORMAL
     #  @addChild(sprite)
     @bitmap = new Bitmap(@pic_width,@pic_height)
+    @alreadySlidedIn = false
     @refresh()
   playExpressHitted: ()->
     @express = @hitted_express
   playExpressAttack: ()->
     @express = @attack_express
   playBattleExpress: (sub,targets)->
-    console.log(targets)
     if sub == @_actor
       if targets && targets.indexOf(@_actor) < 0
         @playExpressAttack()
@@ -149,12 +149,9 @@ class @NiceBody extends @Sprite_Base
     srcs = []
     already_blted = false
     startBlt = ()->
-      console.log("into start blt")
       return if already_blted
-      console.log("not blted")
       for src in srcs
         return unless src.isReady()
-      console.log("start blt")
       already_blted = true
       @bitmap.clear()
       for src in srcs
@@ -168,7 +165,6 @@ class @NiceBody extends @Sprite_Base
 
   update4Battle: ()->
     while (@_actor.isAnimationRequested())
-      console.log(@_actor._animations)
       data = @_actor.shiftAnimation(true);
       animation = $dataAnimations[data.animationId];
       mirror = data.mirror;
@@ -180,20 +176,7 @@ class @NiceBody extends @Sprite_Base
     if @express != @old_express
       @refresh()
       @old_express = @express
-    if @showing
-      @x -= 10
-      @opacity += 25
-      if @x <= Graphics.width - 120
-        @x = Graphics.width - 120
-        @showing = false
-        @opacity = 255
-    if @hiding
-      @x += 10
-      @opacity -= 25
-      if @x >= Graphics.width - 120 + 80
-        @x = Graphics.width - 120 + 80
-        @hiding = false
-        @opacity = 0
+
     if @back_to_normal_express
       @back_to_normal_express -= 1
       if @back_to_normal_express == 0
@@ -202,13 +185,19 @@ class @NiceBody extends @Sprite_Base
 
 
 
-  slideIn: ()->
-    @hiding = false
-    @showing = true
+  slideIn: (func)->
+    #@hiding = false
+    #@showing = true
     @opacity = 0
     @x = Graphics.width - 120 + 80
-  slideOut: ()->
-    @showing = false
-    @hiding = true
+    AnimateItDefaultCurve(this,"x",Graphics.width - 120,30,"easeOut")
+    AnimateItDefaultCurve(this,"opacity",255,30,"easeOut",func)
+    @alreadySlidedIn = true
+  slideOut: (func)->
+    #@showing = false
+    #@hiding = true
     @opacity = 255
     @x = Graphics.width - 120
+    AnimateItDefaultCurve(this,"x",Graphics.width,30,"easeIn")
+    AnimateItDefaultCurve(this,"opacity",0,30,"easeIn",func)
+    @alreadySlidedIn = false
